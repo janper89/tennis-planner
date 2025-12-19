@@ -4,8 +4,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import ParentDashboard from '@/components/ParentDashboard';
-import { getDemoRole, isDemoMode } from '@/lib/demo-utils';
-import { getDemoDataForRole } from '@/lib/demo-data';
 import type { Database } from '@/types/database';
 
 type Player = Database['public']['Tables']['player']['Row'];
@@ -20,23 +18,11 @@ export default function ParentPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
-  const [userEmail, setUserEmail] = useState<string>('demo@example.com');
+  const [userEmail, setUserEmail] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
-      // Check for demo mode first
-      if (isDemoMode() && getDemoRole() === 'parent') {
-        const demoData = getDemoDataForRole('parent');
-        setPlayers(demoData.players);
-        setEntries(demoData.entries);
-        setTournaments(demoData.tournaments);
-        setUserEmail('demo@example.com');
-        setLoading(false);
-        return;
-      }
-
-      // Try to load from Supabase
       try {
         const supabase = createClient();
         const {
@@ -80,7 +66,7 @@ export default function ParentPage() {
             player:player_id (*)
           `
           )
-          .in('player_id', playerIds)
+          .in('player_id', playerIds.length > 0 ? playerIds : ['00000000-0000-0000-0000-000000000000'])
           .order('tournament(datum)', { ascending: true });
 
         // Get tournaments
@@ -96,15 +82,7 @@ export default function ParentPage() {
         setTournaments(tournamentsData || []);
       } catch (error) {
         console.error('Error loading data:', error);
-        // If Supabase fails, fall back to demo mode
-        if (!isDemoMode()) {
-          router.push('/login');
-          return;
-        }
-        const demoData = getDemoDataForRole('parent');
-        setPlayers(demoData.players);
-        setEntries(demoData.entries);
-        setTournaments(demoData.tournaments);
+        router.push('/login');
       } finally {
         setLoading(false);
       }
@@ -130,4 +108,3 @@ export default function ParentPage() {
     />
   );
 }
-

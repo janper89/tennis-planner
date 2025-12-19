@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { formatDate, getWeekNumber, getWeekRange } from '@/lib/utils';
-import { isDemoMode } from '@/lib/demo-utils';
 import type { Database } from '@/types/database';
 
 type Player = Database['public']['Tables']['player']['Row'];
@@ -48,11 +48,6 @@ export default function ParentDashboard({
   }, {} as Record<number, Entry[]>);
 
   const handleAddTournament = async (formData: FormData) => {
-    if (isDemoMode()) {
-      alert('V demo režimu nelze přidávat turnaje. Pro plnou funkcionalitu se přihlas pomocí Supabase.');
-      return;
-    }
-
     setLoading(true);
     try {
       const playerId = formData.get('player_id') as string;
@@ -124,11 +119,6 @@ export default function ParentDashboard({
   };
 
   const handleUpdateEntry = async (formData: FormData) => {
-    if (isDemoMode()) {
-      alert('V demo režimu nelze upravovat turnaje. Pro plnou funkcionalitu se přihlas pomocí Supabase.');
-      return;
-    }
-
     setLoading(true);
     try {
       const entryId = formData.get('entry_id') as string;
@@ -183,11 +173,6 @@ export default function ParentDashboard({
   };
 
   const handleDeleteEntry = async (entryId: string, tournamentId: string) => {
-    if (isDemoMode()) {
-      alert('V demo režimu nelze mazat přihlášky. Pro plnou funkcionalitu se přihlas pomocí Supabase.');
-      return;
-    }
-
     if (!confirm('Opravdu chceš smazat tuto přihlášku?')) return;
 
     setLoading(true);
@@ -225,14 +210,6 @@ export default function ParentDashboard({
   };
 
   const handleLogout = async () => {
-    // Check if in demo mode
-    if (typeof window !== 'undefined' && window.localStorage.getItem('demo_role')) {
-      window.localStorage.removeItem('demo_role');
-      window.localStorage.removeItem('viewRole');
-      window.location.href = '/login';
-      return;
-    }
-    
     await supabase.auth.signOut();
     window.location.href = '/login';
   };
@@ -254,12 +231,20 @@ export default function ParentDashboard({
             <h1 className="text-2xl font-bold text-gray-900">
               Tenisový klub - Rodič
             </h1>
-            <button
-              onClick={handleLogout}
-              className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-            >
-              Odhlásit se
-            </button>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/password"
+                className="rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+              >
+                Změnit heslo
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+              >
+                Odhlásit se
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -567,4 +552,3 @@ export default function ParentDashboard({
     </div>
   );
 }
-

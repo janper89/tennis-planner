@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { formatDate } from '@/lib/utils';
 import type { Database } from '@/types/database';
@@ -25,14 +26,6 @@ export default function CoachDashboard({
   const supabase = createClient();
 
   const handleLogout = async () => {
-    // Check if in demo mode
-    if (typeof window !== 'undefined' && window.localStorage.getItem('demo_role')) {
-      window.localStorage.removeItem('demo_role');
-      window.localStorage.removeItem('viewRole');
-      window.location.href = '/login';
-      return;
-    }
-    
     await supabase.auth.signOut();
     window.location.href = '/login';
   };
@@ -70,12 +63,20 @@ export default function CoachDashboard({
             <h1 className="text-2xl font-bold text-gray-900">
               Tenisový klub - Trenér
             </h1>
-            <button
-              onClick={handleLogout}
-              className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-            >
-              Odhlásit se
-            </button>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/password"
+                className="rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+              >
+                Změnit heslo
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+              >
+                Odhlásit se
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -186,4 +187,3 @@ export default function CoachDashboard({
     </div>
   );
 }
-

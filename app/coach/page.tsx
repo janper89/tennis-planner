@@ -4,8 +4,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import CoachDashboard from '@/components/CoachDashboard';
-import { getDemoRole, isDemoMode } from '@/lib/demo-utils';
-import { getDemoDataForRole } from '@/lib/demo-data';
 import type { Database } from '@/types/database';
 
 type Player = Database['public']['Tables']['player']['Row'];
@@ -24,17 +22,6 @@ export default function CoachPage() {
 
   useEffect(() => {
     async function loadData() {
-      // Check for demo mode first
-      if (isDemoMode() && getDemoRole() === 'coach') {
-        const demoData = getDemoDataForRole('coach');
-        setPlayers(demoData.players);
-        setEntries(demoData.entries);
-        setTournaments(demoData.tournaments);
-        setLoading(false);
-        return;
-      }
-
-      // Try to load from Supabase
       try {
         const supabase = createClient();
         const {
@@ -103,15 +90,7 @@ export default function CoachPage() {
         setTournaments(tournamentsData || []);
       } catch (error) {
         console.error('Error loading data:', error);
-        // If Supabase fails, fall back to demo mode
-        if (!isDemoMode()) {
-          router.push('/login');
-          return;
-        }
-        const demoData = getDemoDataForRole('coach');
-        setPlayers(demoData.players);
-        setEntries(demoData.entries);
-        setTournaments(demoData.tournaments);
+        router.push('/login');
       } finally {
         setLoading(false);
       }
@@ -149,4 +128,3 @@ export default function CoachPage() {
     />
   );
 }
-
