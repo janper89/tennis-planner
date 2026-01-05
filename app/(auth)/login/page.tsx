@@ -32,34 +32,76 @@ export default function LoginPage() {
         } else {
           setError(authError.message);
         }
+        setLoading(false);
         return;
       }
 
       if (!authData.user) {
         setError('Přihlášení se nezdařilo');
+        setLoading(false);
         return;
       }
 
-      // Get user role from app_user table
-      const { data: appUser, error: userError } = await supabase
-        .from('app_user')
-        .select('role')
-        .eq('email', authData.user.email!)
-        .single();
+      const userEmail = authData.user.email!;
 
-      if (userError || !appUser) {
-        setError('Uživatel nemá přiřazenou roli. Kontaktujte administrátora.');
+      // Try RPC function first (if it exists), otherwise fall back to direct query
+      const trimmedEmail = userEmail.trim();
+      
+      let role: UserRole | null = null;
+      
+      // Try RPC function
+      const { data: rpcRole, error: rpcError } = await supabase.rpc('get_user_role_by_email', {
+        user_email: trimmedEmail
+      });
+      
+      if (!rpcError && rpcRole) {
+        role = rpcRole as UserRole;
+      } else {
+        // Fall back to direct query
+        console.log('RPC failed, trying direct query. RPC error:', rpcError);
+        const { data: appUsers, error: userError } = await supabase
+          .from('app_user')
+          .select('role, email, id')
+          .eq('email', trimmedEmail);
+
+        console.log('Direct query result:', { appUsers, userError });
+        
+        if (userError) {
+          console.error('Error fetching user role:', userError);
+          setError(`Chyba při načítání role: ${userError.message}. Zkontroluj konzoli prohlížeče (F12).`);
+          setLoading(false);
+          return;
+        }
+
+        if (!appUsers || appUsers.length === 0) {
+          console.error('No users found for email:', trimmedEmail);
+          setError(`Uživatel s emailem ${trimmedEmail} nemá přiřazenou roli v databázi. Zkontroluj, zda je záznam v tabulce app_user.`);
+          setLoading(false);
+          return;
+        }
+
+        if (appUsers.length > 1) {
+          console.error('Multiple users found with same email:', appUsers);
+          setError(`V databázi je více záznamů se stejným emailem. Kontaktujte administrátora.`);
+          setLoading(false);
+          return;
+        }
+
+        role = appUsers[0].role as UserRole;
+      }
+      
+      if (!role) {
+        setError(`Nepodařilo se získat roli uživatele.`);
+        setLoading(false);
         return;
       }
 
       // Redirect based on role
-      const role = appUser.role as UserRole;
       const redirectPath = ROLE_REDIRECTS[role] || '/';
       router.push(redirectPath);
     } catch (err) {
       console.error('Login error:', err);
       setError('Došlo k chybě při přihlášení');
-    } finally {
       setLoading(false);
     }
   };
