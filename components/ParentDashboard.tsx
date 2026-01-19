@@ -12,11 +12,16 @@ type Entry = Database['public']['Tables']['entry']['Row'] & {
   tournament: Tournament;
   player: Player;
 };
+type Coach = {
+  id: string;
+  email: string;
+};
 
 interface ParentDashboardProps {
   players: Player[];
   entries: Entry[];
   tournaments: Tournament[];
+  coaches: Coach[];
   userEmail: string;
 }
 
@@ -24,6 +29,7 @@ export default function ParentDashboard({
   players: initialPlayers,
   entries: initialEntries,
   tournaments: initialTournaments,
+  coaches,
   userEmail,
 }: ParentDashboardProps) {
   const [players, setPlayers] = useState(initialPlayers);
@@ -33,6 +39,7 @@ export default function ParentDashboard({
     initialPlayers[0] || null
   );
   const [showForm, setShowForm] = useState(false);
+  const [showAddChildForm, setShowAddChildForm] = useState(false);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const [loading, setLoading] = useState(false);
   const supabase = createClient();
@@ -209,6 +216,73 @@ export default function ParentDashboard({
     }
   };
 
+  const handleAddChild = async (formData: FormData) => {
+    setLoading(true);
+    try {
+      const name = formData.get('name') as string;
+      const birthDate = formData.get('birth_date') as string;
+      const rocnik = parseInt(formData.get('rocnik') as string);
+      const category = formData.get('category') as string;
+      const coachId = formData.get('coach_id') as string;
+
+      // Validate required fields
+      if (!name || !birthDate || !rocnik || !coachId) {
+        alert('Vyplň všechna povinná pole');
+        setLoading(false);
+        return;
+      }
+
+      // Validate birth date is not in future
+      const birthDateObj = new Date(birthDate);
+      if (birthDateObj > new Date()) {
+        alert('Datum narození nemůže být v budoucnosti');
+        setLoading(false);
+        return;
+      }
+
+      // Get current user
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      // Get app_user id
+      const { data: appUser } = await supabase
+        .from('app_user')
+        .select('id')
+        .eq('email', user.email!)
+        .single();
+
+      if (!appUser) return;
+
+      // Create player
+      const { error: playerError } = await supabase.from('player').insert({
+        name: name.trim(),
+        birth_date: birthDate,
+        rocnik,
+        category: category.trim() || null,
+        parent_id: appUser.id,
+        coach_id: coachId,
+        limit_turnaju: 16,
+      });
+
+      if (playerError) {
+        alert('Chyba při přidávání dítěte: ' + playerError.message);
+        return;
+      }
+
+      // Refresh data
+      window.location.reload();
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Došlo k chybě');
+    } finally {
+      setLoading(false);
+      setShowAddChildForm(false);
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     window.location.href = '/login';
@@ -250,6 +324,115 @@ export default function ParentDashboard({
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Empty State - No Children */}
+        {players.length === 0 && (
+          <div className="mb-6 rounded-lg bg-white p-8 text-center shadow">
+            <h2 className="mb-4 text-xl font-semibold text-gray-900">
+              Zatím nemáš přidané žádné dítě
+            </h2>
+            <p className="mb-6 text-gray-600">
+              Přidej své první dítě, abys mohl začít plánovat turnaje.
+            </p>
+            <button
+              onClick={() => setShowAddChildForm(true)}
+              className="rounded-md bg-blue-600 px-6 py-3 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              Přidat první dítě
+            </button>
+          </div>
+        )}
+
+        {/* Add Child Form */}
+        {showAddChildForm && (
+          <div className="mb-6 rounded-lg bg-white p-6 shadow">
+            <h3 className="mb-4 text-lg font-semibold">Přidat dítě</h3>
+            <form action={handleAddChild} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Jméno *
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  required
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                  placeholder="Jméno dítěte"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Datum narození *
+                </label>
+                <input
+                  type="date"
+                  name="birth_date"
+                  required
+                  max={new Date().toISOString().split('T')[0]}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Ročník *
+                </label>
+                <input
+                  type="number"
+                  name="rocnik"
+                  required
+                  min="1"
+                  max="20"
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                  placeholder="Např. 2010"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Kategorie
+                </label>
+                <input
+                  type="text"
+                  name="category"
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                  placeholder="Např. U12"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Trenér *
+                </label>
+                <select
+                  name="coach_id"
+                  required
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                >
+                  <option value="">Vyber trenéra</option>
+                  {coaches.map((coach) => (
+                    <option key={coach.id} value={coach.id}>
+                      {coach.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {loading ? 'Přidávám...' : 'Přidat dítě'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAddChildForm(false)}
+                  className="rounded-md bg-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-400"
+                >
+                  Zrušit
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
         {/* Player Overview */}
         {selectedPlayer && (
           <div className="mb-6 rounded-lg bg-white p-6 shadow">
@@ -301,6 +484,18 @@ export default function ParentDashboard({
                 </option>
               ))}
             </select>
+          </div>
+        )}
+
+        {/* Add Child Button */}
+        {players.length > 0 && (
+          <div className="mb-6">
+            <button
+              onClick={() => setShowAddChildForm(true)}
+              className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+            >
+              + Přidat dítě
+            </button>
           </div>
         )}
 

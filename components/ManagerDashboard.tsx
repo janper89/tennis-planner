@@ -18,6 +18,11 @@ type Coach = {
   id: string;
   email: string;
 };
+type Parent = {
+  id: string;
+  email: string;
+  created_at: string;
+};
 
 interface ManagerDashboardProps {
   players: Player[];
@@ -38,6 +43,10 @@ export default function ManagerDashboard({
   const [selectedCoachId, setSelectedCoachId] = useState<string>('all');
   const [selectedWeek, setSelectedWeek] = useState<string>('all');
   const [isAdmin, setIsAdmin] = useState(false);
+  const [parents, setParents] = useState<Parent[]>([]);
+  const [showAddParentForm, setShowAddParentForm] = useState(false);
+  const [newParentEmail, setNewParentEmail] = useState('');
+  const [loadingParents, setLoadingParents] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -47,7 +56,104 @@ export default function ManagerDashboard({
         setIsAdmin(true);
       }
     });
+    // Load parents
+    loadParents();
   }, []);
+
+  const loadParents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_user')
+        .select('id, email, created_at')
+        .eq('role', 'parent')
+        .order('email');
+
+      if (error) {
+        console.error('Error loading parents:', error);
+        return;
+      }
+
+      setParents(data || []);
+    } catch (error) {
+      console.error('Error loading parents:', error);
+    }
+  };
+
+  const handleAddParent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoadingParents(true);
+
+    try {
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(newParentEmail.trim())) {
+        alert('Zadej platnou emailovou adresu');
+        setLoadingParents(false);
+        return;
+      }
+
+      // Check if parent already exists
+      const { data: existing } = await supabase
+        .from('app_user')
+        .select('id')
+        .eq('email', newParentEmail.trim())
+        .single();
+
+      if (existing) {
+        alert('Rodič s tímto emailem již existuje');
+        setLoadingParents(false);
+        return;
+      }
+
+      // Create parent in app_user
+      const { error: insertError } = await supabase
+        .from('app_user')
+        .insert({
+          email: newParentEmail.trim(),
+          role: 'parent',
+        });
+
+      if (insertError) {
+        alert('Chyba při přidávání rodiče: ' + insertError.message);
+        setLoadingParents(false);
+        return;
+      }
+
+      // Success
+      setNewParentEmail('');
+      setShowAddParentForm(false);
+      await loadParents();
+      alert('Rodič byl úspěšně přidán. Rodič může použít "Zapomněl jsem heslo" na přihlašovací stránce.');
+    } catch (error) {
+      console.error('Error adding parent:', error);
+      alert('Došlo k chybě při přidávání rodiče');
+    } finally {
+      setLoadingParents(false);
+    }
+  };
+
+  const handleDeleteParent = async (parentId: string, parentEmail: string) => {
+    if (!confirm(`Opravdu chceš smazat rodiče ${parentEmail}?`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('app_user')
+        .delete()
+        .eq('id', parentId);
+
+      if (error) {
+        alert('Chyba při mazání rodiče: ' + error.message);
+        return;
+      }
+
+      await loadParents();
+    } catch (error) {
+      console.error('Error deleting parent:', error);
+      alert('Došlo k chybě při mazání rodiče');
+    }
+  };
 
   // Filter players by coach
   const filteredPlayers =
@@ -127,6 +233,88 @@ export default function ManagerDashboard({
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Parents Management Section */}
+        <div className="mb-6 rounded-lg bg-white p-6 shadow">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Správa rodičů
+            </h2>
+            <button
+              onClick={() => {
+                setShowAddParentForm(!showAddParentForm);
+                setNewParentEmail('');
+              }}
+              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              {showAddParentForm ? 'Zrušit' : '+ Přidat rodiče'}
+            </button>
+          </div>
+
+          {/* Add Parent Form */}
+          {showAddParentForm && (
+            <form onSubmit={handleAddParent} className="mb-4 space-y-4">
+              <div>
+                <label
+                  htmlFor="parent-email"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Email rodiče
+                </label>
+                <input
+                  id="parent-email"
+                  type="email"
+                  value={newParentEmail}
+                  onChange={(e) => setNewParentEmail(e.target.value)}
+                  required
+                  placeholder="rodic@email.cz"
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loadingParents}
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {loadingParents ? 'Přidávám...' : 'Přidat rodiče'}
+              </button>
+            </form>
+          )}
+
+          {/* Parents List */}
+          <div className="mt-4">
+            <h3 className="mb-2 text-sm font-medium text-gray-700">
+              Seznam rodičů ({parents.length})
+            </h3>
+            {parents.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                Zatím nejsou přidáni žádní rodiče.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {parents.map((parent) => (
+                  <div
+                    key={parent.id}
+                    className="flex items-center justify-between rounded-md border border-gray-200 p-3"
+                  >
+                    <div>
+                      <p className="font-medium text-gray-900">{parent.email}</p>
+                      <p className="text-xs text-gray-500">
+                        Přidáno: {new Date(parent.created_at).toLocaleDateString('cs-CZ')}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteParent(parent.id, parent.email)}
+                      className="rounded-md bg-red-100 px-3 py-1 text-sm text-red-700 hover:bg-red-200"
+                    >
+                      Smazat
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Filters */}
         <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>

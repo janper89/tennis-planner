@@ -101,6 +101,21 @@ CREATE POLICY "Users can update their own record"
     ON app_user FOR UPDATE
     USING (email = auth.jwt() ->> 'email');
 
+CREATE POLICY "Managers can insert users"
+    ON app_user FOR INSERT
+    WITH CHECK (get_user_role() = 'manager');
+
+CREATE POLICY "Managers can view all users"
+    ON app_user FOR SELECT
+    USING (
+        email = auth.jwt() ->> 'email' OR
+        get_user_role() = 'manager'
+    );
+
+CREATE POLICY "Managers can delete users"
+    ON app_user FOR DELETE
+    USING (get_user_role() = 'manager');
+
 -- RLS Policies for player
 -- Parent: can see and manage their own children
 CREATE POLICY "Parents can view their children"

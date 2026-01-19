@@ -12,12 +12,17 @@ type Entry = Database['public']['Tables']['entry']['Row'] & {
   tournament: Tournament;
   player: Player;
 };
+type Coach = {
+  id: string;
+  email: string;
+};
 
 export default function ParentPage() {
   const router = useRouter();
   const [players, setPlayers] = useState<Player[]>([]);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [coaches, setCoaches] = useState<Coach[]>([]);
   const [userEmail, setUserEmail] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
@@ -47,6 +52,18 @@ export default function ParentPage() {
           router.push('/login');
           return;
         }
+
+        // Get all coaches
+        const { data: coachesData } = await supabase
+          .from('app_user')
+          .select('id, email')
+          .eq('role', 'coach')
+          .order('email');
+
+        const coachesList = (coachesData || []).map((c) => ({
+          id: c.id,
+          email: c.email,
+        }));
 
         // Get user's children (players)
         const { data: playersData } = await supabase
@@ -80,6 +97,7 @@ export default function ParentPage() {
         setPlayers(playersData || []);
         setEntries((entriesData as Entry[]) || []);
         setTournaments(tournamentsData || []);
+        setCoaches(coachesList);
       } catch (error) {
         console.error('Error loading data:', error);
         router.push('/login');
@@ -104,6 +122,7 @@ export default function ParentPage() {
       players={players}
       entries={entries}
       tournaments={tournaments}
+      coaches={coaches}
       userEmail={userEmail}
     />
   );

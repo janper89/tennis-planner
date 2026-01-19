@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { ROLE_REDIRECTS, type UserRole } from '@/lib/config';
 
@@ -13,6 +14,32 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   const supabase = createClient();
+
+  useEffect(() => {
+    // Check if we have a recovery token in hash (from password reset email)
+    const hash = window.location.hash;
+    console.log('Login page - hash check:', hash); // Debug
+    
+    if (hash) {
+      const urlParams = new URLSearchParams(hash.substring(1));
+      const type = urlParams.get('type');
+      console.log('Login page - type:', type); // Debug
+      
+      if (type === 'recovery') {
+        console.log('Login page - redirecting to password reset'); // Debug
+        // Redirect to password reset page with hash preserved
+        router.replace(`/password/reset${hash}`);
+        return;
+      }
+    }
+    
+    // Also check query params (some email clients might strip hash)
+    const type = new URLSearchParams(window.location.search).get('type');
+    if (type === 'recovery') {
+      console.log('Login page - recovery type in query, redirecting'); // Debug
+      router.replace('/password/reset');
+    }
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,7 +211,12 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-6 text-center text-xs text-gray-500">
-          Zapomněli jste heslo? Kontaktujte administrátora klubu.
+          <Link
+            href="/password/reset"
+            className="text-emerald-600 hover:text-emerald-700 hover:underline"
+          >
+            Zapomněli jste heslo?
+          </Link>
         </p>
       </div>
     </div>
