@@ -15,18 +15,21 @@ export interface Database {
           email: string
           role: 'parent' | 'coach' | 'manager'
           created_at: string
+          name: string | null
         }
         Insert: {
           id?: string
           email: string
           role?: 'parent' | 'coach' | 'manager'
           created_at?: string
+          name?: string | null
         }
         Update: {
           id?: string
           email?: string
           role?: 'parent' | 'coach' | 'manager'
           created_at?: string
+          name?: string | null
         }
       }
       player: {
@@ -76,6 +79,7 @@ export interface Database {
           poznamka: string | null
           created_by: string | null
           created_at: string
+          tournament_key: string | null
         }
         Insert: {
           id?: string
@@ -88,6 +92,7 @@ export interface Database {
           poznamka?: string | null
           created_by?: string | null
           created_at?: string
+          tournament_key?: string | null
         }
         Update: {
           id?: string
@@ -100,6 +105,7 @@ export interface Database {
           poznamka?: string | null
           created_by?: string | null
           created_at?: string
+          tournament_key?: string | null
         }
       }
       entry: {

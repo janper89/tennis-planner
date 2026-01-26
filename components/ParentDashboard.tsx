@@ -1,10 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { formatDate, getWeekNumber, getWeekRange } from '@/lib/utils';
 import type { Database } from '@/types/database';
+import {
+  registerPlayerForTournament,
+  type RegisterTournamentParams,
+} from '@/lib/tournament-service';
 
 type Player = Database['public']['Tables']['player']['Row'];
 type Tournament = Database['public']['Tables']['tournament']['Row'];
@@ -23,6 +27,7 @@ interface ParentDashboardProps {
   tournaments: Tournament[];
   coaches: Coach[];
   userEmail: string;
+  userName: string;
 }
 
 export default function ParentDashboard({
@@ -31,6 +36,7 @@ export default function ParentDashboard({
   tournaments: initialTournaments,
   coaches,
   userEmail,
+  userName,
 }: ParentDashboardProps) {
   const [players, setPlayers] = useState(initialPlayers);
   const [entries, setEntries] = useState(initialEntries);
@@ -42,7 +48,20 @@ export default function ParentDashboard({
   const [showAddChildForm, setShowAddChildForm] = useState(false);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const [loading, setLoading] = useState(false);
+  const [useAutoSearch, setUseAutoSearch] = useState(true); // Toggle between auto search and manual entry
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [newName, setNewName] = useState(userName);
   const supabase = createClient();
+
+  // Update state when props change
+  useEffect(() => {
+    setPlayers(initialPlayers);
+    setEntries(initialEntries);
+    setTournaments(initialTournaments);
+    setSelectedPlayer(initialPlayers[0] || null);
+    setNewName(userName);
+  }, [initialPlayers, initialEntries, initialTournaments, userName]);
 
   // Group entries by week
   const entriesByWeek = entries.reduce((acc, entry) => {
@@ -56,21 +75,23 @@ export default function ParentDashboard({
 
   const handleAddTournament = async (formData: FormData) => {
     setLoading(true);
+    setSearchError(null);
+    
     try {
       const playerId = formData.get('player_id') as string;
       const nazev = formData.get('nazev') as string;
-      const kategorie = formData.get('kategorie') as string;
-      const misto = formData.get('misto') as string;
-      const datum = formData.get('datum') as string;
-      const poznamka = formData.get('poznamka') as string;
       const priority = parseInt(formData.get('priority') as string);
+      const poznamka = formData.get('poznamka') as string;
 
       // Get current user
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
-      if (!user) return;
+      if (!user) {
+        alert('Musíš být přihlášen');
+        return;
+      }
 
       // Get app_user id
       const { data: appUser } = await supabase
@@ -79,9 +100,51 @@ export default function ParentDashboard({
         .eq('email', user.email!)
         .single();
 
-      if (!appUser) return;
+      if (!appUser) {
+        alert('Uživatel nenalezen');
+        return;
+      }
 
-      // Create tournament
+      // If using auto search, try tournament service first
+      if (useAutoSearch && nazev.trim()) {
+        const params: RegisterTournamentParams = {
+          tournamentName: nazev.trim(),
+          playerId,
+          priority,
+          poznamka: poznamka || undefined,
+          userId: appUser.id,
+        };
+
+        const result = await registerPlayerForTournament(params, supabase);
+
+        if (result.success) {
+          alert(result.message);
+          window.location.reload();
+          return;
+        } else {
+          // If tournament not found, show error and allow fallback to manual entry
+          if (result.error === 'TOURNAMENT_NOT_FOUND') {
+            setSearchError(result.message);
+            // Don't return - allow user to continue with manual entry
+            setUseAutoSearch(false);
+          } else {
+            alert(result.message);
+            return;
+          }
+        }
+      }
+
+      // Manual entry (fallback or user choice)
+      const kategorie = formData.get('kategorie') as string;
+      const misto = formData.get('misto') as string;
+      const datum = formData.get('datum') as string;
+
+      if (!kategorie || !misto || !datum) {
+        alert('Vyplň všechna povinná pole');
+        return;
+      }
+
+      // Create tournament manually
       const { data: tournament, error: tournamentError } = await supabase
         .from('tournament')
         .insert({
@@ -288,6 +351,40 @@ export default function ParentDashboard({
     window.location.href = '/login';
   };
 
+  const handleUpdateName = async () => {
+    if (!newName.trim()) {
+      alert('Jméno nemůže být prázdné');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      const { error } = await supabase
+        .from('app_user')
+        .update({ name: newName.trim() })
+        .eq('email', user.email!);
+
+      if (error) {
+        alert('Chyba při aktualizaci jména: ' + error.message);
+        return;
+      }
+
+      setEditingName(false);
+      window.location.reload();
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Došlo k chybě');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Calculate played tournaments for selected player
   const playerEntries = entries.filter(
     (e) => e.player_id === selectedPlayer?.id
@@ -297,14 +394,91 @@ export default function ParentDashboard({
   ).length;
   const limit = selectedPlayer?.limit_turnaju || 16;
 
+  // Debug logging
+  console.log('ParentDashboard render:', {
+    playersCount: players?.length || 0,
+    entriesCount: entries?.length || 0,
+    tournamentsCount: tournaments?.length || 0,
+    coachesCount: coaches?.length || 0,
+    selectedPlayer: selectedPlayer?.name || 'none',
+    showForm,
+    showAddChildForm,
+    playersIsArray: Array.isArray(players),
+    playersValue: players,
+    userName: userName,
+    userEmail: userEmail,
+    editingName: editingName,
+    newName: newName,
+  });
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow">
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900">
-              Tenisový klub - Rodič
-            </h1>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Tenisový klub - Rodič
+              </h1>
+              {editingName ? (
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    className="rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                    placeholder="Zadej jméno"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleUpdateName}
+                    disabled={loading}
+                    className="rounded-md bg-blue-600 px-3 py-1 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    Uložit
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingName(false);
+                      setNewName(userName);
+                    }}
+                    className="rounded-md bg-gray-300 px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-400"
+                  >
+                    Zrušit
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-1 flex items-center gap-2">
+                  {userName && userName.trim() ? (
+                    <>
+                      <p className="text-sm font-medium text-gray-700">
+                        {userName}
+                      </p>
+                      <button
+                        onClick={() => setEditingName(true)}
+                        className="text-xs text-blue-600 hover:text-blue-700 hover:underline"
+                        title="Upravit jméno"
+                      >
+                        ✏️
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-gray-600">
+                        {userEmail}
+                      </p>
+                      <button
+                        onClick={() => setEditingName(true)}
+                        className="rounded-md bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-200"
+                        title="Přidat jméno"
+                      >
+                        ✏️ Přidat jméno
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-3">
               <Link
                 href="/password"
@@ -325,7 +499,7 @@ export default function ParentDashboard({
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Empty State - No Children */}
-        {players.length === 0 && (
+        {(!players || players.length === 0) && (
           <div className="mb-6 rounded-lg bg-white p-8 text-center shadow">
             <h2 className="mb-4 text-xl font-semibold text-gray-900">
               Zatím nemáš přidané žádné dítě
@@ -520,6 +694,56 @@ export default function ParentDashboard({
             <h3 className="mb-4 text-lg font-semibold">
               {editingEntry ? 'Upravit turnaj' : 'Nový turnaj'}
             </h3>
+            
+            {/* Toggle between auto search and manual entry (only for new entries) */}
+            {!editingEntry && (
+              <div className="mb-4">
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      checked={useAutoSearch}
+                      onChange={() => {
+                        setUseAutoSearch(true);
+                        setSearchError(null);
+                      }}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      Automatické vyhledávání (ITF)
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      checked={!useAutoSearch}
+                      onChange={() => {
+                        setUseAutoSearch(false);
+                        setSearchError(null);
+                      }}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      Ruční zadání
+                    </span>
+                  </label>
+                </div>
+                {useAutoSearch && (
+                  <p className="mt-2 text-xs text-gray-500">
+                    Zadej název turnaje a systém ho automaticky vyhledá v ITF databázi
+                  </p>
+                )}
+                {searchError && (
+                  <div className="mt-2 rounded-md bg-yellow-50 p-3 text-sm text-yellow-800">
+                    {searchError}
+                    <p className="mt-1 text-xs">
+                      Můžeš pokračovat s ručním zadáním níže.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
             <form
               action={editingEntry ? handleUpdateEntry : handleAddTournament}
               className="space-y-4"
@@ -541,49 +765,59 @@ export default function ParentDashboard({
                   name="nazev"
                   required
                   defaultValue={editingEntry?.tournament.nazev || ''}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Kategorie *
-                </label>
-                <input
-                  type="text"
-                  name="kategorie"
-                  required
-                  defaultValue={editingEntry?.tournament.kategorie || ''}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Místo *
-                </label>
-                <input
-                  type="text"
-                  name="misto"
-                  required
-                  defaultValue={editingEntry?.tournament.misto || ''}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Datum *
-                </label>
-                <input
-                  type="date"
-                  name="datum"
-                  required
-                  defaultValue={
-                    editingEntry?.tournament.datum
-                      ? editingEntry.tournament.datum
-                      : ''
+                  placeholder={
+                    useAutoSearch && !editingEntry
+                      ? 'Zadej název turnaje pro vyhledání v ITF'
+                      : 'Název turnaje'
                   }
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
                 />
               </div>
+              {/* Manual entry fields - shown when not using auto search or when editing */}
+              {(!useAutoSearch || editingEntry || searchError) && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Kategorie *
+                    </label>
+                    <input
+                      type="text"
+                      name="kategorie"
+                      required={!useAutoSearch || !!searchError}
+                      defaultValue={editingEntry?.tournament.kategorie || ''}
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Místo *
+                    </label>
+                    <input
+                      type="text"
+                      name="misto"
+                      required={!useAutoSearch || !!searchError}
+                      defaultValue={editingEntry?.tournament.misto || ''}
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Datum *
+                    </label>
+                    <input
+                      type="date"
+                      name="datum"
+                      required={!useAutoSearch || !!searchError}
+                      defaultValue={
+                        editingEntry?.tournament.datum
+                          ? editingEntry.tournament.datum
+                          : ''
+                      }
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                    />
+                  </div>
+                </>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700">
                   Priorita (1-3) *
@@ -623,6 +857,8 @@ export default function ParentDashboard({
                   onClick={() => {
                     setShowForm(false);
                     setEditingEntry(null);
+                    setSearchError(null);
+                    setUseAutoSearch(true);
                   }}
                   className="rounded-md bg-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-400"
                 >
