@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 
-export default function PasswordResetPage() {
+function PasswordResetContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
@@ -328,5 +328,19 @@ export default function PasswordResetPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function PasswordResetPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100">
+        <div className="text-center">
+          <p className="text-gray-600">Načítání...</p>
+        </div>
+      </div>
+    }>
+      <PasswordResetContent />
+    </Suspense>
   );
 }

@@ -6,6 +6,9 @@ type TournamentInsert = Database['public']['Tables']['tournament']['Insert'];
 type Entry = Database['public']['Tables']['entry']['Row'];
 type EntryInsert = Database['public']['Tables']['entry']['Insert'];
 
+// Helper type to ensure correct typing
+type TournamentInsertType = Database['public']['Tables']['tournament']['Insert'];
+
 /**
  * Result from ITF API search (placeholder - to be replaced with actual API)
  */
@@ -130,7 +133,7 @@ export async function createTournament(
 ): Promise<Tournament> {
   try {
     // Map ITF data to our database schema
-    const tournamentInsert: TournamentInsert = {
+    const tournamentInsert: TournamentInsertType = {
       nazev: tournamentData.name,
       kategorie: tournamentData.category || 'N/A',
       misto: tournamentData.city,
@@ -142,7 +145,7 @@ export async function createTournament(
 
     const { data, error } = await supabase
       .from('tournament')
-      .insert(tournamentInsert)
+      .insert(tournamentInsert as any)
       .select()
       .single();
 
@@ -195,7 +198,7 @@ export async function createEntry(
 
     const { data, error } = await supabase
       .from('entry')
-      .insert(entryInsert)
+      .insert(entryInsert as any)
       .select()
       .single();
 
