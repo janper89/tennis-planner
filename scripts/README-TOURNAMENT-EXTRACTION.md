@@ -40,6 +40,16 @@ Skript vrátí JSON ve formátu:
 }
 ```
 
+## Hromadný import do cache
+
+Po extrakci více turnajů (pro každý factsheet spusť skript a zkopíruj JSON) slož objekty do jednoho pole a ulož jako `data/tournament-cache.json`. Pak v kořeni projektu spusť:
+
+```bash
+node scripts/import-tournament-cache.js
+```
+
+Více viz **TOURNAMENT_SERVICE.md** – sekce „Hromadný import cache“.
+
 ## Poznámky
 
 - Tournament Key je extrahován z URL parametru `tournamentId`

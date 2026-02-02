@@ -33,6 +33,10 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# tournament cache data (use data/tournament-cache.json.example as template)
+/data/tournament-cache.json
+/data/calendar-debug.html
+
 # vercel
 .vercel
 

@@ -108,6 +108,32 @@ export interface Database {
           tournament_key?: string | null
         }
       }
+      tournament_cache: {
+        Row: {
+          tournament_key: string
+          name: string
+          city: string
+          start_date: string
+          category: string | null
+          created_at: string
+        }
+        Insert: {
+          tournament_key: string
+          name: string
+          city: string
+          start_date: string
+          category?: string | null
+          created_at?: string
+        }
+        Update: {
+          tournament_key?: string
+          name?: string
+          city?: string
+          start_date?: string
+          category?: string | null
+          created_at?: string
+        }
+      }
       entry: {
         Row: {
           id: string

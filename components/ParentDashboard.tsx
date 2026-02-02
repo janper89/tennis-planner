@@ -745,7 +745,15 @@ export default function ParentDashboard({
             )}
 
             <form
-              action={editingEntry ? handleUpdateEntry : handleAddTournament}
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget as HTMLFormElement);
+                if (editingEntry) {
+                  await handleUpdateEntry(formData);
+                } else {
+                  await handleAddTournament(formData);
+                }
+              }}
               className="space-y-4"
             >
               {editingEntry && (

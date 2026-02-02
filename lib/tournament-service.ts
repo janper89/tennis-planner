@@ -45,40 +45,42 @@ export interface RegisterTournamentResult {
 }
 
 /**
- * Search for a tournament by name using ITF API
- * 
- * @param name Tournament name to search for
- * @returns Tournament details or null if not found/API unavailable
+ * Search for a tournament by name in the tournament_cache table.
+ * Cache is populated periodically from factsheets (e.g. every 2 months).
+ *
+ * @param supabase Supabase client instance
+ * @param name Tournament name to search for (partial match)
+ * @returns Tournament details or null if not found in cache
  */
 export async function searchTournamentByName(
+  supabase: SupabaseClient<Database>,
   name: string
 ): Promise<ITFTournamentSearchResult | null> {
   try {
-    // TODO: Replace with actual ITF API call
-    // For now, this is a placeholder that simulates API behavior
-    
-    // Check if ITF API URL is configured
-    const itfApiUrl = process.env.NEXT_PUBLIC_ITF_API_URL;
-    
-    if (!itfApiUrl) {
-      console.warn('ITF API URL not configured, using placeholder');
-      // Return null to trigger fallback to manual entry
+    const query = name.trim();
+    if (!query) return null;
+
+    const { data, error } = await supabase
+      .from('tournament_cache')
+      .select('tournament_key, name, city, start_date, category')
+      .ilike('name', `%${query}%`)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error searching tournament cache:', error);
       return null;
     }
 
-    // Placeholder: In real implementation, this would call ITF API
-    // Example:
-    // const response = await fetch(`${itfApiUrl}/search?name=${encodeURIComponent(name)}`, {
-    //   headers: {
-    //     'Authorization': `Bearer ${process.env.ITF_API_KEY}`,
-    //   },
-    // });
-    // if (!response.ok) return null;
-    // const data = await response.json();
-    // return mapITFResponseToSearchResult(data);
+    if (!data) return null;
 
-    // For now, return null to indicate API is not available
-    return null;
+    return {
+      tournamentKey: data.tournament_key,
+      name: data.name,
+      city: data.city,
+      startDate: data.start_date,
+      category: data.category ?? undefined,
+    };
   } catch (error) {
     console.error('Error searching tournament:', error);
     return null;
@@ -240,16 +242,16 @@ export async function registerPlayerForTournament(
   supabase: SupabaseClient<Database>
 ): Promise<RegisterTournamentResult> {
   try {
-    // Step 1: Search for tournament by name
-    const searchResult = await searchTournamentByName(params.tournamentName);
+    // Step 1: Search for tournament by name in cache (no live ITF API)
+    const searchResult = await searchTournamentByName(supabase, params.tournamentName);
 
     if (!searchResult) {
-      // Tournament not found in ITF API or API unavailable
+      // Tournament not found in cache
       return {
         success: false,
         tournamentId: '',
         entryId: '',
-        message: 'Turnaj nebyl nalezen v ITF databázi. Použijte prosím ruční zadání.',
+        message: 'Turnaj nebyl nalezen v seznamu turnajů. Použijte prosím ruční zadání.',
         error: 'TOURNAMENT_NOT_FOUND',
       };
     }

@@ -1,0 +1,16 @@
+[
+  {
+    "tournamentKey": "f25547bf-5bf7-407a-bd96-142afa09f2bc",
+    "tournamentName": "Prague Junior Open",
+    "city": "Praha",
+    "startDate": "2025-03-15",
+    "category": "J60"
+  },
+  {
+    "tournament_key": "uuid-druhy-turnaj",
+    "name": "Brno Cup",
+    "city": "Brno",
+    "start_date": "2025-04-01",
+    "category": "J30"
+  }
+]

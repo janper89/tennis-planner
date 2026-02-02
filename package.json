@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "import-cache": "node scripts/import-tournament-cache.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
@@ -18,6 +19,8 @@
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
+    "dotenv": "^16.4.5",
+    "puppeteer": "^24.0.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

@@ -1,32 +1,47 @@
 # Tournament Service - Dokumentace
 
+**První nastavení?** Projděte krok za krokem průvodce: [docs/PRUVODCE-CACHE-TURNAJU.md](docs/PRUVODCE-CACHE-TURNAJU.md).
+
 ## Přehled
 
-Tournament Service je centralizovaný modul pro automatické vyhledávání turnajů z ITF databáze a registraci hráčů. Service eliminuje duplicity pomocí `tournament_key` a zjednodušuje proces přihlašování.
+Tournament Service je centralizovaný modul pro vyhledávání turnajů v cache (naplněné z factsheetů) a registraci hráčů. Service eliminuje duplicity pomocí `tournament_key` a zjednodušuje proces přihlašování.
 
 ## Instalace
 
-### 1. Databázová migrace
+### 1. Databázové migrace
 
-Spusť SQL migraci v Supabase SQL Editoru:
+Spusť v Supabase SQL Editoru (v tomto pořadí):
 
-```sql
--- Soubor: supabase/add_tournament_key.sql
-ALTER TABLE tournament 
-ADD COLUMN IF NOT EXISTS tournament_key TEXT;
+1. **tournament_key na tabulce tournament** – soubor `supabase/add_tournament_key.sql`
+2. **Tabulka cache pro vyhledávání** – soubor `supabase/tournament_cache.sql`
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_tournament_key ON tournament(tournament_key) 
-WHERE tournament_key IS NOT NULL;
+Tabulka `tournament_cache` slouží k vyhledávání podle názvu. Naplňuje se periodicky (např. jednou za 2 měsíce) – viz **Hromadný import** níže.
+
+### 2. Hromadný import cache (nárazově)
+
+Turnaje do cache **nenaplňuješ jeden po druhém** – naplníš je najednou z jednoho JSON souboru.
+
+**Krok 1 – Získat data:**  
+Pro každý turnaj, který chceš mít v cache, otevři v prohlížeči factsheet na IPIN (přihlášený), spusť v konzoli skript z `scripts/extract-tournament-browser.js` (nebo `extract-tournament-data.js`) – vyexportuje jeden objekt (název, město, datum, tournamentKey). Tyto objekty slož do jednoho pole a ulož jako JSON (např. `data/tournament-cache.json`). Můžeš také ručně sestavit JSON podle příkladu níže.
+
+**Krok 2 – Formát JSON:**  
+Soubor musí obsahovat **pole objektů**. Každý objekt může být ve formátu z extrakce nebo v „DB“ formátu:
+
+- Z extrakce: `{ "tournamentKey", "tournamentName", "city", "startDate", "category?" }`
+- DB formát: `{ "tournament_key", "name", "city", "start_date", "category?" }`
+
+Datum může být `YYYY-MM-DD` nebo `DD.MM.YYYY`. Příklad: `data/tournament-cache.json.example`.
+
+**Krok 3 – Spustit import:**  
+V kořeni projektu (s načteným `.env.local` nebo exportovanými proměnnými):
+
+```bash
+node scripts/import-tournament-cache.js [cesta/k/souboru.json]
 ```
 
-### 2. Environment Variables (volitelné)
+Bez argumentu se použije `data/tournament-cache.json`. Potřebné env: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (klíč najdeš v Supabase Dashboard → Project Settings → API → service_role).
 
-Pro budoucí integraci s ITF API přidej do `.env.local`:
-
-```env
-NEXT_PUBLIC_ITF_API_URL=https://api.itf.com
-ITF_API_KEY=your-api-key-here
-```
+Skript provede **upsert** podle `tournament_key` – při opakovaném importu se záznamy aktualizují, nevznikají duplicity.
 
 ## Použití
 
@@ -34,11 +49,11 @@ ITF_API_KEY=your-api-key-here
 
 Service je integrován do `ParentDashboard` komponenty. Uživatel má dvě možnosti:
 
-1. **Automatické vyhledávání (ITF)**
+1. **Automatické vyhledávání (cache)**
    - Zadej název turnaje
-   - Service vyhledá turnaj v ITF databázi
+   - Service vyhledá turnaj v tabulce `tournament_cache` (částečná shoda názvu)
    - Pokud nalezen, automaticky vytvoří turnaj a přihlášku
-   - Pokud nenalezen, zobrazí chybu s možností ručního zadání
+   - Pokud nenalezen, zobrazí hlášku s možností ručního zadání
 
 2. **Ruční zadání**
    - Zadej všechny údaje manuálně (název, kategorie, místo, datum)
@@ -94,9 +109,13 @@ Hlavní funkce pro registraci hráče na turnaj.
 
 ### `searchTournamentByName`
 
-Vyhledá turnaj podle názvu v ITF databázi.
+Vyhledá turnaj podle názvu v tabulce `tournament_cache` (částečná shoda, první nalezený).
 
-**Poznámka:** Aktuálně vrací `null` (placeholder). Po implementaci ITF API bude vracet detaily turnaje.
+**Parametry:**
+- `supabase: SupabaseClient<Database>` – klient Supabase
+- `name: string` – hledaný název turnaje
+
+**Návratová hodnota:** `ITFTournamentSearchResult | null` (název, město, datum, kategorie, tournament_key).
 
 ### `findTournamentByKey`
 
@@ -136,10 +155,7 @@ Vytvoří přihlášku hráče na turnaj.
 
 ## Budoucí vylepšení
 
-- [ ] Implementace skutečného ITF API endpointu
-- [ ] Cache pro vyhledané turnaje
-- [ ] Batch import turnajů
-- [ ] Synchronizace s ITF databází
+- [ ] Automatizace stahování seznamu turnajů (kalendář IPIN / ITF)
 - [ ] Notifikace o změnách v turnajích
 
 ## Poznámky
