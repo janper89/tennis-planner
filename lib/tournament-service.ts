@@ -9,6 +9,15 @@ type EntryInsert = Database['public']['Tables']['entry']['Insert'];
 // Helper type to ensure correct typing
 type TournamentInsertType = Database['public']['Tables']['tournament']['Insert'];
 
+/** Row from tournament_cache (explicit type for select result) */
+type TournamentCacheRow = {
+  tournament_key: string;
+  name: string;
+  city: string;
+  start_date: string;
+  category: string | null;
+};
+
 /**
  * Result from ITF API search (placeholder - to be replaced with actual API)
  */
@@ -72,14 +81,15 @@ export async function searchTournamentByName(
       return null;
     }
 
-    if (!data) return null;
+    const row = data as TournamentCacheRow | null;
+    if (!row) return null;
 
     return {
-      tournamentKey: data.tournament_key,
-      name: data.name,
-      city: data.city,
-      startDate: data.start_date,
-      category: data.category ?? undefined,
+      tournamentKey: row.tournament_key,
+      name: row.name,
+      city: row.city,
+      startDate: row.start_date,
+      category: row.category ?? undefined,
     };
   } catch (error) {
     console.error('Error searching tournament:', error);
