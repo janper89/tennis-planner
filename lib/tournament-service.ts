@@ -2,12 +2,9 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/types/database';
 
 type Tournament = Database['public']['Tables']['tournament']['Row'];
-type TournamentInsert = Database['public']['Tables']['tournament']['Insert'];
 type Entry = Database['public']['Tables']['entry']['Row'];
-type EntryInsert = Database['public']['Tables']['entry']['Insert'];
-
-// Helper type to ensure correct typing
 type TournamentInsertType = Database['public']['Tables']['tournament']['Insert'];
+type EntryInsertType = Database['public']['Tables']['entry']['Insert'];
 
 /** Row from tournament_cache (explicit type for select result) */
 type TournamentCacheRow = {
@@ -39,6 +36,8 @@ export interface RegisterTournamentParams {
   priority: number;
   poznamka?: string;
   userId: string; // app_user.id
+  /** Předvybraný turnaj (při výběru z více výsledků) – přeskočí vyhledávání */
+  selectedTournament?: ITFTournamentSearchResult;
 }
 
 /**
@@ -94,6 +93,48 @@ export async function searchTournamentByName(
   } catch (error) {
     console.error('Error searching tournament:', error);
     return null;
+  }
+}
+
+/**
+ * Vyhledá více turnajů podle názvu v tournament_cache (pro výběr z více shod).
+ *
+ * @param supabase Supabase client instance
+ * @param name Hledaný název (částečná shoda)
+ * @param limit Maximální počet výsledků (výchozí 10)
+ */
+export async function searchTournamentsByName(
+  supabase: SupabaseClient<Database>,
+  name: string,
+  limit = 10
+): Promise<ITFTournamentSearchResult[]> {
+  try {
+    const query = name.trim();
+    if (!query) return [];
+
+    const { data, error } = await supabase
+      .from('tournament_cache')
+      .select('tournament_key, name, city, start_date, category')
+      .ilike('name', `%${query}%`)
+      .order('start_date', { ascending: true })
+      .limit(limit);
+
+    if (error) {
+      console.error('Error searching tournament cache:', error);
+      return [];
+    }
+
+    const rows = (data ?? []) as TournamentCacheRow[];
+    return rows.map((row) => ({
+      tournamentKey: row.tournament_key,
+      name: row.name,
+      city: row.city,
+      startDate: row.start_date,
+      category: row.category ?? undefined,
+    }));
+  } catch (error) {
+    console.error('Error searching tournaments:', error);
+    return [];
   }
 }
 
@@ -157,6 +198,7 @@ export async function createTournament(
 
     const { data, error } = await supabase
       .from('tournament')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase Insert infers never when DB types are out of sync
       .insert(tournamentInsert as any)
       .select()
       .single();
@@ -200,7 +242,7 @@ export async function createEntry(
   supabase: SupabaseClient<Database>
 ): Promise<Entry> {
   try {
-    const entryInsert: EntryInsert = {
+    const entryInsert: EntryInsertType = {
       player_id: playerId,
       tournament_id: tournamentId,
       priority,
@@ -210,6 +252,7 @@ export async function createEntry(
 
     const { data, error } = await supabase
       .from('entry')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase Insert infers never when DB types are out of sync
       .insert(entryInsert as any)
       .select()
       .single();
@@ -252,8 +295,11 @@ export async function registerPlayerForTournament(
   supabase: SupabaseClient<Database>
 ): Promise<RegisterTournamentResult> {
   try {
-    // Step 1: Search for tournament by name in cache (no live ITF API)
-    const searchResult = await searchTournamentByName(supabase, params.tournamentName);
+    // Step 1: Use selected tournament or search in cache
+    let searchResult: ITFTournamentSearchResult | null = params.selectedTournament ?? null;
+    if (!searchResult) {
+      searchResult = await searchTournamentByName(supabase, params.tournamentName);
+    }
 
     if (!searchResult) {
       // Tournament not found in cache
@@ -277,9 +323,10 @@ export async function registerPlayerForTournament(
     if (!tournament) {
       try {
         tournament = await createTournament(searchResult, params.userId, supabase);
-      } catch (error: any) {
+      } catch (error: unknown) {
         // If tournament creation fails due to duplicate key, try to fetch it
-        if (error.message?.includes('již existuje')) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (typeof message === 'string' && message.includes('již existuje')) {
           tournament = await findTournamentByKey(searchResult.tournamentKey, supabase);
           if (!tournament) {
             throw error;
@@ -311,18 +358,22 @@ export async function registerPlayerForTournament(
       message: `Hráč byl úspěšně přihlášen na turnaj "${tournament.nazev}"`,
       tournament,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error registering player for tournament:', error);
+
+    const errorMessage =
+      error instanceof Error ? error.message : 'Došlo k chybě při přihlašování na turnaj';
     
-    // Return user-friendly error message
-    const errorMessage = error.message || 'Došlo k chybě při přihlašování na turnaj';
-    
+    const code =
+      typeof error === 'object' && error !== null && 'code' in error
+        ? String((error as { code: string }).code)
+        : 'UNKNOWN_ERROR';
     return {
       success: false,
       tournamentId: '',
       entryId: '',
       message: errorMessage,
-      error: error.code || 'UNKNOWN_ERROR',
+      error: code,
     };
   }
 }
