@@ -3,7 +3,12 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { formatDate, getWeekNumber } from '@/lib/utils';
+import {
+  formatDate,
+  getWeekNumber,
+  getAgeFromBirthDate,
+  getMaxTournamentsForAge,
+} from '@/lib/utils';
 import { ADMIN_EMAILS } from '@/lib/config';
 import RoleSwitcher from '@/components/RoleSwitcher';
 import type { Database } from '@/types/database';
@@ -369,7 +374,9 @@ export default function ManagerDashboard({
                     <div className="font-semibold">{player.name}</div>
                     <div className="text-xs font-normal text-gray-400">
                       {player.rocnik} • {getPlayedCount(player.id)} /{' '}
-                      {player.limit_turnaju}
+                      {getMaxTournamentsForAge(
+                        getAgeFromBirthDate(player.birth_date)
+                      )}
                     </div>
                   </th>
                 ))}

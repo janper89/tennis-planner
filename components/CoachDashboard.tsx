@@ -2,7 +2,11 @@
 
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { formatDate } from '@/lib/utils';
+import {
+  formatDate,
+  getAgeFromBirthDate,
+  getMaxTournamentsForAge,
+} from '@/lib/utils';
 import type { Database } from '@/types/database';
 
 type Player = Database['public']['Tables']['player']['Row'];
@@ -98,7 +102,9 @@ export default function CoachDashboard({
                     <div className="font-semibold">{player.name}</div>
                     <div className="text-xs font-normal text-gray-400">
                       {player.rocnik} • {getPlayedCount(player.id)} /{' '}
-                      {player.limit_turnaju}
+                      {getMaxTournamentsForAge(
+                        getAgeFromBirthDate(player.birth_date)
+                      )}
                     </div>
                   </th>
                 ))}
@@ -174,7 +180,10 @@ export default function CoachDashboard({
                   Ročník: {player.rocnik} • Kategorie: {player.category || '-'}
                 </p>
                 <p className="mt-2 text-sm">
-                  Turnaje: {playedCount} / {player.limit_turnaju}
+                  Turnaje: {playedCount} /{' '}
+                  {getMaxTournamentsForAge(
+                    getAgeFromBirthDate(player.birth_date)
+                  )}
                 </p>
                 <p className="text-sm text-gray-600">
                   Přihlášeno: {playerEntries.length}

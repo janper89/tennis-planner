@@ -90,6 +90,13 @@ export default function ManagerPage() {
     }
 
     loadData();
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') loadData();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () =>
+      document.removeEventListener('visibilitychange', onVisibilityChange);
   }, [router]);
 
   if (loading) {

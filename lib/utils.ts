@@ -33,3 +33,23 @@ export function getWeekRange(date: Date | string): { start: Date; end: Date } {
   return { start, end };
 }
 
+/** Věk k 1.1. referenčního roku (pro sezónu). */
+export function getAgeFromBirthDate(
+  birthDate: string,
+  referenceDate?: Date
+): number {
+  const ref = referenceDate ?? new Date();
+  const birth = new Date(birthDate);
+  const refYear = ref.getFullYear();
+  const birthYear = birth.getFullYear();
+  return Math.max(0, refYear - birthYear);
+}
+
+/** Max. počet turnajů dle věku: 13→10, 14→14, 15→18, 16→25; <13→10, >16→25. */
+export function getMaxTournamentsForAge(age: number): number {
+  if (age <= 13) return 10;
+  if (age === 14) return 14;
+  if (age === 15) return 18;
+  return 25; // 16+
+}
+

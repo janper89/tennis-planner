@@ -110,6 +110,13 @@ export default function ParentPage() {
     }
 
     loadData();
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') loadData();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () =>
+      document.removeEventListener('visibilitychange', onVisibilityChange);
   }, [router]);
 
   if (loading) {

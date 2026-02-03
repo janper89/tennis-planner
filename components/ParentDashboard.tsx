@@ -3,7 +3,13 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { formatDate, getWeekNumber, getWeekRange } from '@/lib/utils';
+import {
+  formatDate,
+  getWeekNumber,
+  getWeekRange,
+  getAgeFromBirthDate,
+  getMaxTournamentsForAge,
+} from '@/lib/utils';
 import type { Database } from '@/types/database';
 import {
   registerPlayerForTournament,
@@ -55,6 +61,7 @@ export default function ParentDashboard({
   const [searchResults, setSearchResults] = useState<ITFTournamentSearchResult[] | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState(userName);
+  const [addChildBirthDate, setAddChildBirthDate] = useState('');
   const supabase = createClient();
 
   // Update state when props change
@@ -65,6 +72,11 @@ export default function ParentDashboard({
     setSelectedPlayer(initialPlayers[0] || null);
     setNewName(userName);
   }, [initialPlayers, initialEntries, initialTournaments, userName]);
+
+  // Reset add-child form preview when form is closed
+  useEffect(() => {
+    if (!showAddChildForm) setAddChildBirthDate('');
+  }, [showAddChildForm]);
 
   // Group entries by week
   const entriesByWeek = entries.reduce((acc, entry) => {
@@ -416,6 +428,10 @@ export default function ParentDashboard({
 
       if (!appUser) return;
 
+      const limitTurnaju = getMaxTournamentsForAge(
+        getAgeFromBirthDate(birthDate)
+      );
+
       // Create player
       const { error: playerError } = await supabase.from('player').insert({
         name: name.trim(),
@@ -424,7 +440,7 @@ export default function ParentDashboard({
         category: category.trim() || null,
         parent_id: appUser.id,
         coach_id: coachId,
-        limit_turnaju: 16,
+        limit_turnaju: limitTurnaju,
       });
 
       if (playerError) {
@@ -489,7 +505,9 @@ export default function ParentDashboard({
   const playedCount = playerEntries.filter(
     (e) => e.status === 'odehrano'
   ).length;
-  const limit = selectedPlayer?.limit_turnaju || 16;
+  const limit = selectedPlayer
+    ? getMaxTournamentsForAge(getAgeFromBirthDate(selectedPlayer.birth_date))
+    : 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -621,9 +639,19 @@ export default function ParentDashboard({
                   type="date"
                   name="birth_date"
                   required
+                  value={addChildBirthDate}
+                  onChange={(e) => setAddChildBirthDate(e.target.value)}
                   max={new Date().toISOString().split('T')[0]}
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
                 />
+                {addChildBirthDate && (
+                  <p className="mt-1 text-sm text-gray-600">
+                    Max. turnajů v sezóně:{' '}
+                    {getMaxTournamentsForAge(
+                      getAgeFromBirthDate(addChildBirthDate)
+                    )}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">
