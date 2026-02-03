@@ -1,0 +1,74 @@
+# Každý měsíc stáhne turnaje z ITF Juniors na 3 měsíce dopředu a naimportuje je do Supabase tournament_cache.
+# Spouští se 1. v měsíci ve 3:00 UTC (4:00 / 5:00 CET podle DST). Lze spustit i ručně (Run workflow).
+
+name: Update tournament cache (3 months)
+
+on:
+  schedule:
+    - cron: '0 3 1 * *'
+  workflow_dispatch:
+
+jobs:
+  update-cache:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium dependencies (Puppeteer)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+            libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
+            libgbm1 libasound2 libpango-1.0-0 libcairo2
+
+      - name: Set 3 months (M1, M2, M3)
+        id: months
+        run: |
+          node -e "
+          const d = new Date();
+          const m1 = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+          d.setMonth(d.getMonth() + 1);
+          const m2 = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+          d.setMonth(d.getMonth() + 1);
+          const m3 = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+          console.log('M1=' + m1);
+          console.log('M2=' + m2);
+          console.log('M3=' + m3);
+          " >> $GITHUB_ENV
+
+      - name: Fetch month 1
+        run: node scripts/fetch-calendar-itf-juniors.js "$M1"
+
+      - name: Merge baseline
+        run: cp data/tournament-cache.json data/all.json
+
+      - name: Fetch month 2
+        run: node scripts/fetch-calendar-itf-juniors.js "$M2"
+
+      - name: Merge month 2
+        run: node scripts/merge-tournament-cache.js data/all.json data/tournament-cache.json data/all.json
+
+      - name: Fetch month 3
+        run: node scripts/fetch-calendar-itf-juniors.js "$M3"
+
+      - name: Merge month 3 and prepare import file
+        run: |
+          node scripts/merge-tournament-cache.js data/all.json data/tournament-cache.json data/all.json
+          cp data/all.json data/tournament-cache.json
+
+      - name: Import to Supabase
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/import-tournament-cache.js data/tournament-cache.json
