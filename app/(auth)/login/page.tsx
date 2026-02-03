@@ -16,27 +16,17 @@ export default function LoginPage() {
   const supabase = createClient();
 
   useEffect(() => {
-    // Check if we have a recovery token in hash (from password reset email)
     const hash = window.location.hash;
-    console.log('Login page - hash check:', hash); // Debug
-    
     if (hash) {
       const urlParams = new URLSearchParams(hash.substring(1));
       const type = urlParams.get('type');
-      console.log('Login page - type:', type); // Debug
-      
       if (type === 'recovery') {
-        console.log('Login page - redirecting to password reset'); // Debug
-        // Redirect to password reset page with hash preserved
         router.replace(`/password/reset${hash}`);
         return;
       }
     }
-    
-    // Also check query params (some email clients might strip hash)
     const type = new URLSearchParams(window.location.search).get('type');
     if (type === 'recovery') {
-      console.log('Login page - recovery type in query, redirecting'); // Debug
       router.replace('/password/reset');
     }
   }, [router]);
@@ -84,31 +74,24 @@ export default function LoginPage() {
       if (!rpcError && rpcRole) {
         role = rpcRole as UserRole;
       } else {
-        // Fall back to direct query
-        console.log('RPC failed, trying direct query. RPC error:', rpcError);
         const { data: appUsers, error: userError } = await supabase
           .from('app_user')
           .select('role, email, id')
           .eq('email', trimmedEmail);
 
-        console.log('Direct query result:', { appUsers, userError });
-        
         if (userError) {
-          console.error('Error fetching user role:', userError);
           setError(`Chyba při načítání role: ${userError.message}. Zkontroluj konzoli prohlížeče (F12).`);
           setLoading(false);
           return;
         }
 
         if (!appUsers || appUsers.length === 0) {
-          console.error('No users found for email:', trimmedEmail);
           setError(`Uživatel s emailem ${trimmedEmail} nemá přiřazenou roli v databázi. Zkontroluj, zda je záznam v tabulce app_user.`);
           setLoading(false);
           return;
         }
 
         if (appUsers.length > 1) {
-          console.error('Multiple users found with same email:', appUsers);
           setError(`V databázi je více záznamů se stejným emailem. Kontaktujte administrátora.`);
           setLoading(false);
           return;
@@ -126,8 +109,7 @@ export default function LoginPage() {
       // Redirect based on role
       const redirectPath = ROLE_REDIRECTS[role] || '/';
       router.push(redirectPath);
-    } catch (err) {
-      console.error('Login error:', err);
+    } catch {
       setError('Došlo k chybě při přihlášení');
       setLoading(false);
     }

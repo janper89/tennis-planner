@@ -18,75 +18,41 @@ function PasswordResetContent() {
   const supabase = createClient();
 
   useEffect(() => {
-    // Check for recovery token immediately on mount
     const checkRecovery = () => {
-      // Check hash fragment (Supabase default)
       const hash = window.location.hash;
-      console.log('🔍 Checking for recovery token. Hash:', hash);
-      console.log('🔍 Full URL:', window.location.href);
-      
       if (hash) {
         const params = new URLSearchParams(hash.substring(1));
         const type = params.get('type');
-        console.log('🔍 Type from hash:', type);
         if (type === 'recovery') {
-          console.log('✅ Recovery token found in hash, setting step to reset');
           setStep('reset');
           return true;
         }
       }
-      
-      // Check query params
       try {
         const queryType = searchParams.get('type');
-        console.log('🔍 Type from query params:', queryType);
         if (queryType === 'recovery') {
-          console.log('✅ Recovery token found in query params, setting step to reset');
           setStep('reset');
           return true;
         }
-      } catch (e) {
+      } catch {
         // searchParams might not be available yet
-        console.log('🔍 searchParams not available yet');
       }
-      
-      console.log('❌ No recovery token found');
       return false;
     };
 
-    // Check immediately
-    const hasRecovery = checkRecovery();
-    
-    if (hasRecovery) {
-      // If recovery found, wait for Supabase to process it
-      setTimeout(async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        console.log('🔍 Session check after recovery:', session ? 'exists' : 'none');
-        if (session) {
-          console.log('✅ Session exists, ready for password reset');
-        }
-      }, 1000);
-    }
+    checkRecovery();
 
-    // Listen for auth state changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('🔔 Auth event:', event, session ? 'has session' : 'no session');
-      
       if (event === 'PASSWORD_RECOVERY') {
-        console.log('✅ PASSWORD_RECOVERY event - setting step to reset');
         setStep('reset');
       } else if (event === 'SIGNED_IN' && session) {
-        // Check if we have recovery hash
         const hash = window.location.hash;
         if (hash && hash.includes('type=recovery')) {
-          console.log('✅ SIGNED_IN with recovery hash - setting step to reset');
           setStep('reset');
           window.history.replaceState(null, '', window.location.pathname);
         } else if (window.location.pathname === '/password/reset') {
-          // If we're on reset page and have session, might be recovery
-          console.log('✅ SIGNED_IN on reset page - setting step to reset');
           setStep('reset');
         }
       }
@@ -104,10 +70,7 @@ function PasswordResetContent() {
     setLoading(true);
 
     try {
-      // Use current origin (localhost in dev, vercel in prod)
       const redirectUrl = `${window.location.origin}/password/reset`;
-      console.log('🔍 Sending reset email with redirect URL:', redirectUrl);
-      
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         email.trim(),
         {

@@ -349,6 +349,33 @@ export default function ParentDashboard({
     }
   };
 
+  const handleUnmarkAsPlayed = async (entryId: string) => {
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('entry')
+        .update({ status: 'planovano' })
+        .eq('id', entryId);
+
+      if (error) {
+        alert('Chyba při vrácení turnaje: ' + error.message);
+        setLoading(false);
+        return;
+      }
+
+      setEntries((prev) =>
+        prev.map((e) =>
+          e.id === entryId ? { ...e, status: 'planovano' as const } : e
+        )
+      );
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Došlo k chybě');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAddChild = async (formData: FormData) => {
     setLoading(true);
     try {
@@ -463,23 +490,6 @@ export default function ParentDashboard({
     (e) => e.status === 'odehrano'
   ).length;
   const limit = selectedPlayer?.limit_turnaju || 16;
-
-  // Debug logging
-  console.log('ParentDashboard render:', {
-    playersCount: players?.length || 0,
-    entriesCount: entries?.length || 0,
-    tournamentsCount: tournaments?.length || 0,
-    coachesCount: coaches?.length || 0,
-    selectedPlayer: selectedPlayer?.name || 'none',
-    showForm,
-    showAddChildForm,
-    playersIsArray: Array.isArray(players),
-    playersValue: players,
-    userName: userName,
-    userEmail: userEmail,
-    editingName: editingName,
-    newName: newName,
-  });
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -831,6 +841,25 @@ export default function ParentDashboard({
               {editingEntry && (
                 <input type="hidden" name="entry_id" value={editingEntry.id} />
               )}
+              {editingEntry?.status === 'odehrano' && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
+                  <p className="mb-2 text-sm font-medium text-amber-900">
+                    Tento turnaj je označen jako odehrán.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await handleUnmarkAsPlayed(editingEntry.id);
+                      setEditingEntry(null);
+                      setShowForm(false);
+                    }}
+                    disabled={loading}
+                    className="rounded-md bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-800 hover:bg-amber-200 disabled:opacity-50"
+                  >
+                    Zrušit odehráno (vrátit na plánováno)
+                  </button>
+                </div>
+              )}
               <input
                 type="hidden"
                 name="player_id"
@@ -1068,7 +1097,7 @@ export default function ParentDashboard({
                               )}
                             </div>
                             <div className="ml-4 flex flex-wrap gap-2">
-                              {entry.status !== 'odehrano' && (
+                              {entry.status !== 'odehrano' ? (
                                 <button
                                   type="button"
                                   onClick={() => handleMarkAsPlayed(entry.id)}
@@ -1076,6 +1105,16 @@ export default function ParentDashboard({
                                   className="rounded-md bg-green-100 px-3 py-1 text-sm text-green-700 hover:bg-green-200 disabled:opacity-50"
                                 >
                                   Odehráno
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUnmarkAsPlayed(entry.id)}
+                                  disabled={loading}
+                                  className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                                  title="Turnaj jsi neodehrál – vrátí se mezi plánované"
+                                >
+                                  Zrušit odehráno
                                 </button>
                               )}
                               <button
