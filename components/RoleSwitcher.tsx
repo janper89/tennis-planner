@@ -1,32 +1,49 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import { ROLE_REDIRECTS } from '@/lib/config';
 import type { UserRole } from '@/lib/config';
 
+const VALID_ROLES: UserRole[] = ['parent', 'coach', 'manager'];
+
+function getViewRoleSnapshot(): UserRole {
+  if (typeof window === 'undefined') return 'manager';
+  const saved = localStorage.getItem('viewRole');
+  return (saved && VALID_ROLES.includes(saved as UserRole))
+    ? (saved as UserRole)
+    : 'manager';
+}
+
+function getServerSnapshot(): UserRole {
+  return 'manager';
+}
+
+const listeners = new Set<() => void>();
+
+function subscribe(callback: () => void): () => void {
+  listeners.add(callback);
+  return () => listeners.delete(callback);
+}
+
+function notifyListeners(): void {
+  listeners.forEach((cb) => cb());
+}
+
 export default function RoleSwitcher() {
-  const [viewRole, setViewRole] = useState<UserRole>('manager');
+  const viewRole = useSyncExternalStore(subscribe, getViewRoleSnapshot, getServerSnapshot);
   const router = useRouter();
 
-  useEffect(() => {
-    // Load from localStorage
-    const saved = localStorage.getItem('viewRole') as UserRole;
-    if (saved && ['parent', 'coach', 'manager'].includes(saved)) {
-      setViewRole(saved);
-    }
-  }, []);
-
   const handleRoleChange = (role: UserRole) => {
-    setViewRole(role);
     localStorage.setItem('viewRole', role);
+    notifyListeners();
     router.push(ROLE_REDIRECTS[role]);
   };
 
   return (
     <div className="flex items-center gap-2 rounded-md border border-gray-300 bg-white p-1">
       <span className="px-2 text-xs text-gray-600">Zobrazit jako:</span>
-      {(['parent', 'coach', 'manager'] as UserRole[]).map((role) => (
+      {VALID_ROLES.map((role) => (
         <button
           key={role}
           onClick={() => handleRoleChange(role)}
@@ -42,4 +59,3 @@ export default function RoleSwitcher() {
     </div>
   );
 }
-

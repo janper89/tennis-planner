@@ -1,8 +1,17 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { ROLE_REDIRECTS, type UserRole } from '@/lib/config';
+import { checkLoginRateLimit } from '@/lib/rate-limit';
 
 export async function POST(request: Request) {
+  const { allowed } = checkLoginRateLimit(request);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'Příliš mnoho pokusů o přihlášení. Zkuste to znovu za minutu.' },
+      { status: 429 }
+    );
+  }
+
   try {
     const { email, password } = await request.json();
 

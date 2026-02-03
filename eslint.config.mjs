@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Node scripts (require, etc.) – not part of Next build
+    "scripts/**",
   ]),
 ]);
 
