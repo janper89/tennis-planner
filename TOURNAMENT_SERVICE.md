@@ -22,7 +22,10 @@ Tabulka `tournament_cache` slouží k vyhledávání podle názvu. Naplňuje se 
 Turnaje do cache **nenaplňuješ jeden po druhém** – naplníš je najednou z jednoho JSON souboru.
 
 **Krok 1 – Získat data:**  
-Pro každý turnaj, který chceš mít v cache, otevři v prohlížeči factsheet na IPIN (přihlášený), spusť v konzoli skript z `scripts/extract-tournament-browser.js` (nebo `extract-tournament-data.js`) – vyexportuje jeden objekt (název, město, datum, tournamentKey). Tyto objekty slož do jednoho pole a ulož jako JSON (např. `data/tournament-cache.json`). Můžeš také ručně sestavit JSON podle příkladu níže.
+- **IPIN factsheet (přihlášení):** Otevři factsheet na ipin.itftennis.com, v konzoli spusť `scripts/extract-tournament-browser.js` (nebo `extract-tournament-data.js`) – vyexportuje jeden objekt (název, město, datum, tournamentKey).  
+- **Veřejný ITF factsheet (Fáze A, bez přihlášení):** Otevři veřejný factsheet na itftennis.com (např. `/en/tournament/.../j100-...`), v konzoli spusť `scripts/extract-itf-factsheet-browser.js` – vyexportuje plný objekt včetně `entryDeadline`, `withdrawDeadline`, `country`, `venue`, `surface`.  
+
+Objekty z kterékoliv varianty slož do jednoho pole a ulož jako JSON (např. `data/tournament-cache.json`). Můžeš také ručně sestavit JSON podle příkladu níže.
 
 **Krok 2 – Formát JSON:**  
 Soubor musí obsahovat **pole objektů**. Každý objekt může být ve formátu z extrakce nebo v „DB“ formátu:
@@ -65,6 +68,7 @@ Service je integrován do `ParentDashboard` komponenty. Uživatel má dvě možn
 1. **Automatické vyhledávání (cache)**
    - Zadej název turnaje
    - Service vyhledá turnaj v tabulce `tournament_cache` (částečná shoda názvu)
+   - U výsledků se zobrazují i pole z factsheetu (deadline přihlášek, draw size), pokud jsou v cache
    - Pokud nalezen, automaticky vytvoří turnaj a přihlášku
    - Pokud nenalezen, zobrazí hlášku s možností ručního zadání
 

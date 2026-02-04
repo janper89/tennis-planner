@@ -43,6 +43,8 @@ export interface Database {
           parent_id: string | null
           limit_turnaju: number
           created_at: string
+          parent_connection_code: string | null
+          parent_connection_code_expires_at: string | null
         }
         Insert: {
           id?: string
@@ -54,6 +56,8 @@ export interface Database {
           parent_id?: string | null
           limit_turnaju?: number
           created_at?: string
+          parent_connection_code?: string | null
+          parent_connection_code_expires_at?: string | null
         }
         Update: {
           id?: string
@@ -65,6 +69,8 @@ export interface Database {
           parent_id?: string | null
           limit_turnaju?: number
           created_at?: string
+          parent_connection_code?: string | null
+          parent_connection_code_expires_at?: string | null
         }
       }
       tournament: {
@@ -116,6 +122,13 @@ export interface Database {
           start_date: string
           category: string | null
           created_at: string
+          country: string | null
+          venue: string | null
+          end_date: string | null
+          draw_size: string | null
+          entry_deadline: string | null
+          withdrawal_deadline: string | null
+          tournament_director_name: string | null
         }
         Insert: {
           tournament_key: string
@@ -124,6 +137,13 @@ export interface Database {
           start_date: string
           category?: string | null
           created_at?: string
+          country?: string | null
+          venue?: string | null
+          end_date?: string | null
+          draw_size?: string | null
+          entry_deadline?: string | null
+          withdrawal_deadline?: string | null
+          tournament_director_name?: string | null
         }
         Update: {
           tournament_key?: string
@@ -132,6 +152,13 @@ export interface Database {
           start_date?: string
           category?: string | null
           created_at?: string
+          country?: string | null
+          venue?: string | null
+          end_date?: string | null
+          draw_size?: string | null
+          entry_deadline?: string | null
+          withdrawal_deadline?: string | null
+          tournament_director_name?: string | null
         }
       }
       entry: {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
   formatDate,
@@ -62,7 +63,12 @@ export default function ParentDashboard({
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState(userName);
   const [addChildBirthDate, setAddChildBirthDate] = useState('');
+  const [connectionCode, setConnectionCode] = useState('');
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [connectionSuccess, setConnectionSuccess] = useState<string | null>(null);
+  const [connectionLoading, setConnectionLoading] = useState(false);
   const supabase = createClient();
+  const router = useRouter();
 
   // Update state when props change
   useEffect(() => {
@@ -459,6 +465,42 @@ export default function ParentDashboard({
     }
   };
 
+  const handleConnectWithCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setConnectionError(null);
+    setConnectionSuccess(null);
+    const code = connectionCode.trim();
+    if (!code) {
+      setConnectionError('Zadej kód');
+      return;
+    }
+    setConnectionLoading(true);
+    try {
+      const { data, error } = await supabase.rpc('connect_child_with_code', {
+        code_input: code,
+      });
+      if (error) {
+        setConnectionError(error.message);
+        return;
+      }
+      const result = data as { success: boolean; error?: string; player_name?: string };
+      if (!result.success) {
+        setConnectionError(result.error ?? 'Neplatný kód');
+        return;
+      }
+      setConnectionSuccess(
+        result.player_name ? `Připojeno dítě: ${result.player_name}` : 'Dítě bylo připojeno.'
+      );
+      setConnectionCode('');
+      router.refresh();
+    } catch (err) {
+      console.error(err);
+      setConnectionError('Došlo k chybě');
+    } finally {
+      setConnectionLoading(false);
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     window.location.href = '/login';
@@ -596,6 +638,43 @@ export default function ParentDashboard({
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Connect child with code */}
+        <div className="mb-6 rounded-lg bg-white p-6 shadow">
+          <h3 className="mb-2 text-lg font-semibold">Připojit dítě pomocí kódu</h3>
+          <p className="mb-4 text-sm text-gray-600">
+            Pokud ti trenér nebo manažer dal kód pro připojení k profilu dítěte, zadej ho níže.
+          </p>
+          <form onSubmit={handleConnectWithCode} className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[200px] flex-1">
+              <label htmlFor="connection-code" className="sr-only">
+                Kód
+              </label>
+              <input
+                id="connection-code"
+                type="text"
+                value={connectionCode}
+                onChange={(e) => setConnectionCode(e.target.value.toUpperCase())}
+                placeholder="Např. A1B2C3D4"
+                className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                maxLength={20}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={connectionLoading}
+              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {connectionLoading ? 'Ověřuji...' : 'Připojit'}
+            </button>
+          </form>
+          {connectionError && (
+            <p className="mt-2 text-sm text-red-600">{connectionError}</p>
+          )}
+          {connectionSuccess && (
+            <p className="mt-2 text-sm text-green-600">{connectionSuccess}</p>
+          )}
+        </div>
+
         {/* Empty State - No Children */}
         {(!players || players.length === 0) && (
           <div className="mb-6 rounded-lg bg-white p-8 text-center shadow">
@@ -921,19 +1000,28 @@ export default function ParentDashboard({
                     {searchResults.map((r) => (
                       <label
                         key={r.tournamentKey}
-                        className="flex cursor-pointer items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 hover:bg-gray-50"
+                        className="flex cursor-pointer flex-col gap-0.5 rounded border border-gray-200 bg-white px-3 py-2 hover:bg-gray-50"
                       >
-                        <input
-                          type="radio"
-                          name="selectedTournamentKey"
-                          value={r.tournamentKey}
-                          required
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-800">
-                          {r.name} – {r.city} – {formatDate(r.startDate)}
-                          {r.category ? ` (${r.category})` : ''}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="selectedTournamentKey"
+                            value={r.tournamentKey}
+                            required
+                            className="h-4 w-4 shrink-0 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-800">
+                            {r.name} – {r.city} – {formatDate(r.startDate)}
+                            {r.category ? ` (${r.category})` : ''}
+                          </span>
+                        </div>
+                        {(r.entryDeadline || r.drawSize) && (
+                          <div className="ml-6 text-xs text-gray-500">
+                            {r.entryDeadline && <span>Přihlášky: {r.entryDeadline}</span>}
+                            {r.entryDeadline && r.drawSize && ' · '}
+                            {r.drawSize && <span>Draw: {r.drawSize}</span>}
+                          </div>
+                        )}
                       </label>
                     ))}
                   </div>

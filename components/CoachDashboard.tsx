@@ -54,6 +54,9 @@ export default function CoachDashboard({
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<ITFTournamentSearchResult[] | null>(null);
   const [addPlayerBirthDate, setAddPlayerBirthDate] = useState('');
+  const [editingEntryForTournament, setEditingEntryForTournament] = useState<Entry | null>(null);
+  const [generatedCodeForPlayer, setGeneratedCodeForPlayer] = useState<{ playerId: string; code: string } | null>(null);
+  const [generateCodeLoading, setGenerateCodeLoading] = useState(false);
   const supabase = createClient();
 
   // Update state when props change
@@ -385,6 +388,46 @@ export default function CoachDashboard({
     }
   };
 
+  const handleUpdateTournament = async (formData: FormData) => {
+    if (!editingEntryForTournament) return;
+
+    const nazev = formData.get('nazev') as string;
+    const kategorie = formData.get('kategorie') as string;
+    const misto = formData.get('misto') as string;
+    const datum = formData.get('datum') as string;
+
+    if (!nazev?.trim() || !kategorie?.trim() || !misto?.trim() || !datum) {
+      alert('Vyplň všechna pole');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('tournament')
+        .update({
+          nazev: nazev.trim(),
+          kategorie: kategorie.trim(),
+          misto: misto.trim(),
+          datum,
+        })
+        .eq('id', editingEntryForTournament.tournament_id);
+
+      if (error) {
+        alert('Chyba při úpravě turnaje: ' + error.message);
+        return;
+      }
+
+      setEditingEntryForTournament(null);
+      window.location.reload();
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Došlo k chybě');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const playedCount = selectedPlayer
     ? getPlayedCount(selectedPlayer.id)
     : 0;
@@ -664,20 +707,29 @@ export default function CoachDashboard({
                     {searchResults.map((r) => (
                       <label
                         key={r.tournamentKey}
-                        className="flex items-start gap-2"
+                        className="flex cursor-pointer flex-col gap-0.5 rounded border border-gray-200 bg-white px-3 py-2 hover:bg-gray-50"
                       >
-                        <input
-                          type="radio"
-                          name="selectedTournamentKey"
-                          value={r.tournamentKey}
-                          className="mt-1"
-                        />
-                        <span className="text-sm">
-                          <span className="font-medium">{r.name}</span>
-                          <br />
-                          {r.city} • {r.startDate}
-                          {r.category && ` • ${r.category}`}
-                        </span>
+                        <div className="flex items-start gap-2">
+                          <input
+                            type="radio"
+                            name="selectedTournamentKey"
+                            value={r.tournamentKey}
+                            className="mt-1"
+                          />
+                          <span className="text-sm">
+                            <span className="font-medium">{r.name}</span>
+                            <br />
+                            {r.city} • {formatDate(r.startDate)}
+                            {r.category && ` • ${r.category}`}
+                          </span>
+                        </div>
+                        {(r.entryDeadline || r.drawSize) && (
+                          <div className="ml-6 text-xs text-gray-500">
+                            {r.entryDeadline && <span>Přihlášky: {r.entryDeadline}</span>}
+                            {r.entryDeadline && r.drawSize && ' · '}
+                            {r.drawSize && <span>Draw: {r.drawSize}</span>}
+                          </div>
+                        )}
                       </label>
                     ))}
                   </div>
@@ -875,46 +927,124 @@ export default function CoachDashboard({
                     </h4>
                     <div className="space-y-2">
                       {weekEntries.map((entry) => (
-                        <div
-                          key={entry.id}
-                          className="flex items-center justify-between rounded-md bg-gray-50 p-3"
-                        >
-                          <div>
-                            <p className="font-medium">
-                              {entry.tournament.nazev}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              {formatDate(entry.tournament.datum)} •{' '}
-                              {entry.tournament.misto} •{' '}
-                              {entry.tournament.kategorie}
-                            </p>
-                            <p className="text-sm">
-                              Priorita: P{entry.priority}
-                              {entry.status === 'odehrano' && (
-                                <span className="ml-2 text-green-600">
-                                  (Odehráno)
-                                </span>
-                              )}
-                            </p>
-                          </div>
-                          <div className="flex gap-2">
-                            {entry.status !== 'odehrano' && (
-                              <button
-                                onClick={() => handleMarkAsPlayed(entry.id)}
-                                disabled={loading}
-                                className="rounded-md bg-green-100 px-3 py-1 text-sm text-green-700 hover:bg-green-200 disabled:opacity-50"
-                              >
-                                Odehráno
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleDeleteEntry(entry.id)}
-                              disabled={loading}
-                              className="rounded-md bg-red-100 px-3 py-1 text-sm text-red-700 hover:bg-red-200 disabled:opacity-50"
+                        <div key={entry.id}>
+                          {editingEntryForTournament?.id === entry.id ? (
+                            <form
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                handleUpdateTournament(new FormData(e.currentTarget as HTMLFormElement));
+                              }}
+                              className="rounded-md border-2 border-blue-200 bg-blue-50/50 p-4"
                             >
-                              Smazat
-                            </button>
-                          </div>
+                              <h5 className="mb-3 text-sm font-medium text-gray-700">
+                                Upravit turnaj
+                              </h5>
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                <div>
+                                  <label className="block text-xs text-gray-600">Název</label>
+                                  <input
+                                    type="text"
+                                    name="nazev"
+                                    required
+                                    defaultValue={entry.tournament.nazev}
+                                    className="mt-0.5 block w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-gray-600">Datum</label>
+                                  <input
+                                    type="date"
+                                    name="datum"
+                                    required
+                                    defaultValue={entry.tournament.datum}
+                                    className="mt-0.5 block w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-gray-600">Místo</label>
+                                  <input
+                                    type="text"
+                                    name="misto"
+                                    required
+                                    defaultValue={entry.tournament.misto}
+                                    className="mt-0.5 block w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-gray-600">Kategorie</label>
+                                  <input
+                                    type="text"
+                                    name="kategorie"
+                                    required
+                                    defaultValue={entry.tournament.kategorie}
+                                    className="mt-0.5 block w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
+                                  />
+                                </div>
+                              </div>
+                              <div className="mt-3 flex gap-2">
+                                <button
+                                  type="submit"
+                                  disabled={loading}
+                                  className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                  {loading ? 'Ukládám...' : 'Uložit'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingEntryForTournament(null)}
+                                  className="rounded bg-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-400"
+                                >
+                                  Zrušit
+                                </button>
+                              </div>
+                            </form>
+                          ) : (
+                            <div className="flex items-center justify-between rounded-md bg-gray-50 p-3">
+                              <div>
+                                <p className="font-medium">
+                                  {entry.tournament.nazev}
+                                </p>
+                                <p className="text-sm text-gray-600">
+                                  {formatDate(entry.tournament.datum)} •{' '}
+                                  {entry.tournament.misto} •{' '}
+                                  {entry.tournament.kategorie}
+                                </p>
+                                <p className="text-sm">
+                                  Priorita: P{entry.priority}
+                                  {entry.status === 'odehrano' && (
+                                    <span className="ml-2 text-green-600">
+                                      (Odehráno)
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => setEditingEntryForTournament(entry)}
+                                  disabled={loading}
+                                  className="rounded-md bg-amber-100 px-3 py-1 text-sm text-amber-800 hover:bg-amber-200 disabled:opacity-50"
+                                >
+                                  Upravit
+                                </button>
+                                {entry.status !== 'odehrano' && (
+                                  <button
+                                    onClick={() => handleMarkAsPlayed(entry.id)}
+                                    disabled={loading}
+                                    className="rounded-md bg-green-100 px-3 py-1 text-sm text-green-700 hover:bg-green-200 disabled:opacity-50"
+                                  >
+                                    Odehráno
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleDeleteEntry(entry.id)}
+                                  disabled={loading}
+                                  className="rounded-md bg-red-100 px-3 py-1 text-sm text-red-700 hover:bg-red-200 disabled:opacity-50"
+                                >
+                                  Smazat
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -930,6 +1060,7 @@ export default function CoachDashboard({
             {players.map((player) => {
               const playerEntriesList = entriesByPlayer[player.id] || [];
               const playerPlayedCount = getPlayedCount(player.id);
+              const showGeneratedCode = generatedCodeForPlayer?.playerId === player.id;
               return (
                 <div
                   key={player.id}
@@ -948,6 +1079,49 @@ export default function CoachDashboard({
                   <p className="text-sm text-gray-600">
                     Přihlášeno: {playerEntriesList.length}
                   </p>
+                  {!player.parent_id && (
+                    <div className="mt-3 border-t border-gray-100 pt-3">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setGenerateCodeLoading(true);
+                          setGeneratedCodeForPlayer(null);
+                          try {
+                            const { data, error } = await supabase.rpc(
+                              'generate_parent_connection_code',
+                              { p_player_id: player.id, p_expires_in_days: 7 }
+                            );
+                            if (error) {
+                              alert('Chyba: ' + error.message);
+                              return;
+                            }
+                            const result = data as { success: boolean; code?: string; error?: string };
+                            if (result.success && result.code) {
+                              setGeneratedCodeForPlayer({ playerId: player.id, code: result.code });
+                            } else {
+                              alert(result.error ?? 'Nepodařilo se vygenerovat kód');
+                            }
+                          } finally {
+                            setGenerateCodeLoading(false);
+                          }
+                        }}
+                        disabled={generateCodeLoading}
+                        className="rounded bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800 hover:bg-amber-200 disabled:opacity-50"
+                      >
+                        {generateCodeLoading ? '…' : 'Vygenerovat kód pro rodiče'}
+                      </button>
+                      {showGeneratedCode && generatedCodeForPlayer && (
+                        <div className="mt-2 rounded bg-amber-50 p-2 text-sm">
+                          <p className="font-mono font-semibold text-amber-900">
+                            {generatedCodeForPlayer.code}
+                          </p>
+                          <p className="mt-1 text-xs text-amber-700">
+                            Předaj kód rodiči. Platnost 7 dní.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

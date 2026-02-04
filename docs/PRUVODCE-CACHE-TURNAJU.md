@@ -34,6 +34,10 @@ Bez těchto tabulek aplikace nemůže vyhledávat v cache.
 - Znovu **Run**.
 - Mělo by se zobrazit „Success“.
 
+**1c) Rozšíření o pole z factsheetu (volitelné)**
+
+- Pokud chceš ukládat plná data z factsheetu (draw size, deadliny, ředitel, venue atd.), otevři `supabase/tournament_cache_factsheet_columns.sql`, zkopíruj obsah do SQL Editoru a **Run**.
+
 Tím máš v databázi tabulku `tournament_cache` a sloupec `tournament_key` u tabulky `tournament`.
 
 ---
@@ -63,6 +67,12 @@ Nemusíš otevírat každý turnaj zvlášť. Jeden příkaz stáhne seznam turn
 4. Pokračuj **Krokem 4** (env) a **Krokem 5** (import do DB). Factshet nemusíš otevírat.
 
 **Poznámka:** Pokud ITF změní vzhled kalendáře, selektory ve skriptu může být potřeba upravit. V takovém případě můžeš dočasně použít Variantu B nebo C.
+
+**Automatické stažení plných factsheetů (doporučeno):** Po spuštění kalendáře můžeš jedním příkazem stáhnout pro všechny turnaje z kalendáře plná data (draw size, deadliny, ředitel atd.) a rovnou je importovat do Supabase:
+```bash
+node scripts/fetch-factsheets-bulk.js --import
+```
+Volitelně: `--limit=5` (jen prvních 5 turnajů), nebo uvést cestu k jinému JSON: `node scripts/fetch-factsheets-bulk.js data/jiny-kalendar.json --import`. Výstup se ukládá do `data/tournament-cache-full.json`.
 
 ### Varianta B: Rychlý test – ruční JSON (na první vyzkoušení)
 
@@ -105,6 +115,18 @@ Použij jen tehdy, když potřebuješ data z IPIN, která na veřejném kalendá
 6. Vlož zkopírovaný kód do konzole a stiskni **Enter**.
 7. V konzoli se zobrazí vyextrahovaný JSON a měl by se zkopírovat do schránky.
 8. Pro **každý další turnaj** otevři jeho factsheet, znovu vlož ten samý skript do konzole a Enter. Z konzole (nebo staženého souboru) zkopíruj výstup.
+
+### Varianta C2: Extrakce z veřejného ITF factsheetu (Fáze A – plná extrakce)
+
+Pro **veřejné** factsheety (bez přihlášení na IPIN) použij skript **Fáze A**, který vytáhne všechny dostupné údaje: název, město, země, venue, datum začátku/konce, entry deadline, withdrawal deadline, kategorie, povrch.
+
+1. Otevři veřejný factsheet na **https://www.itftennis.com/en/tournament/...** (např. `.../j100-bloemfontein/rsa/2026/j-j100-rsa-2026-001/`).
+2. Otevři **Developer Console** (F12 nebo Cmd+Option+I).
+3. Zkopíruj celý obsah souboru **`scripts/extract-itf-factsheet-browser.js`** a vlož ho do konzole.
+4. Stiskni **Enter**.
+5. V konzoli se zobrazí JSON, zkopíruje se do schránky a v konzoli se objeví odkaz na stažení souboru (pravý klik → Uložit odkaz jako).
+
+Vyextrahovaná pole: `tournamentKey`, `tournamentName`, `city`, `country`, `venue`, `startDate`, `endDate`, `drawSize`, `entryDeadline`, `withdrawalDeadline`, `tournamentDirectorName`, `officialBall` a další. **Import do Supabase:** ulož výstup jako JSON soubor (jednořádkový objekt nebo pole objektů), pak v terminálu spusť `node scripts/import-tournament-cache.js cesta/k/souboru.json`. Pro ukládání všech těchto polí musí být v Supabase spuštěna migrace **1c** (`tournament_cache_factsheet_columns.sql`).
 
 **Složení více turnajů do jednoho souboru:**
 

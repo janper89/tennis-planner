@@ -13,10 +13,17 @@ type TournamentCacheRow = {
   city: string;
   start_date: string;
   category: string | null;
+  country?: string | null;
+  venue?: string | null;
+  end_date?: string | null;
+  draw_size?: string | null;
+  entry_deadline?: string | null;
+  withdrawal_deadline?: string | null;
+  tournament_director_name?: string | null;
 };
 
 /**
- * Result from ITF API search (placeholder - to be replaced with actual API)
+ * Result from ITF cache search (tournament_cache, optionally with factsheet fields).
  */
 export interface ITFTournamentSearchResult {
   tournamentKey: string;
@@ -24,7 +31,30 @@ export interface ITFTournamentSearchResult {
   city: string;
   startDate: string; // ISO date string (YYYY-MM-DD)
   category?: string;
-  // Additional fields can be added based on actual ITF API response
+  country?: string | null;
+  venue?: string | null;
+  endDate?: string | null;
+  drawSize?: string | null;
+  entryDeadline?: string | null;
+  withdrawalDeadline?: string | null;
+  tournamentDirectorName?: string | null;
+}
+
+function mapCacheRowToSearchResult(row: TournamentCacheRow): ITFTournamentSearchResult {
+  return {
+    tournamentKey: row.tournament_key,
+    name: row.name,
+    city: row.city,
+    startDate: row.start_date,
+    category: row.category ?? undefined,
+    country: row.country ?? undefined,
+    venue: row.venue ?? undefined,
+    endDate: row.end_date ?? undefined,
+    drawSize: row.draw_size ?? undefined,
+    entryDeadline: row.entry_deadline ?? undefined,
+    withdrawalDeadline: row.withdrawal_deadline ?? undefined,
+    tournamentDirectorName: row.tournament_director_name ?? undefined,
+  };
 }
 
 /**
@@ -70,7 +100,7 @@ export async function searchTournamentByName(
 
     const { data, error } = await supabase
       .from('tournament_cache')
-      .select('tournament_key, name, city, start_date, category')
+      .select('tournament_key, name, city, start_date, category, country, venue, end_date, draw_size, entry_deadline, withdrawal_deadline, tournament_director_name')
       .ilike('name', `%${query}%`)
       .limit(1)
       .maybeSingle();
@@ -83,13 +113,7 @@ export async function searchTournamentByName(
     const row = data as TournamentCacheRow | null;
     if (!row) return null;
 
-    return {
-      tournamentKey: row.tournament_key,
-      name: row.name,
-      city: row.city,
-      startDate: row.start_date,
-      category: row.category ?? undefined,
-    };
+    return mapCacheRowToSearchResult(row);
   } catch (error) {
     console.error('Error searching tournament:', error);
     return null;
@@ -114,7 +138,7 @@ export async function searchTournamentsByName(
 
     const { data, error } = await supabase
       .from('tournament_cache')
-      .select('tournament_key, name, city, start_date, category')
+      .select('tournament_key, name, city, start_date, category, country, venue, end_date, draw_size, entry_deadline, withdrawal_deadline, tournament_director_name')
       .ilike('name', `%${query}%`)
       .order('start_date', { ascending: true })
       .limit(limit);
@@ -125,13 +149,7 @@ export async function searchTournamentsByName(
     }
 
     const rows = (data ?? []) as TournamentCacheRow[];
-    return rows.map((row) => ({
-      tournamentKey: row.tournament_key,
-      name: row.name,
-      city: row.city,
-      startDate: row.start_date,
-      category: row.category ?? undefined,
-    }));
+    return rows.map((row) => mapCacheRowToSearchResult(row));
   } catch (error) {
     console.error('Error searching tournaments:', error);
     return [];

@@ -67,11 +67,13 @@ async function main() {
         const links = row.querySelectorAll('a[href*="tournament"], a[href*="factsheet"]');
         let name = '';
         let tournamentId = null;
+        let factSheetUrl = null;
         for (const a of links) {
           const text = (a.textContent || '').trim();
           if (text.length > 2 && text.length < 200) {
             name = text;
             tournamentId = getTournamentIdFromLink(a);
+            if (a.href && a.href.includes('itftennis') && (a.href.includes('/tournament/') || a.href.includes('factsheet'))) factSheetUrl = a.href;
             break;
           }
         }
@@ -81,16 +83,23 @@ async function main() {
         }
 
         let dateStr = '';
+        const dateCandidates = [];
         let city = '';
         let category = '';
         const cellTexts = Array.from(cells).map((c) => (c.textContent || '').trim());
         for (let i = 0; i < cellTexts.length; i++) {
           const t = cellTexts[i];
-          if (/\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}|\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}/.test(t) && !dateStr) dateStr = t;
+          if (/\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}|\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}/.test(t)) {
+            dateCandidates.push(t);
+          }
           if (/^[A-Za-z\s\-]+$/.test(t) && t.length > 1 && t.length < 80 && !t.match(/^(J\d+|Category|Date|City|Nation)$/i)) {
             if (!city && i > 0) city = t;
           }
           if (/^J\d+$/i.test(t)) category = t;
+        }
+        // Použij poslední datum v řádku (skutečné datum turnaje), ne první (často společné „týden 2.1.“)
+        if (dateCandidates.length > 0) {
+          dateStr = dateCandidates[dateCandidates.length - 1];
         }
         if (!dateStr) {
           const dateCell = row.querySelector('td[class*="date"], [data-date]');
@@ -99,6 +108,10 @@ async function main() {
         if (!city) city = 'N/A';
 
         if (!name) continue;
+        const nameLower = name.toLowerCase();
+        if (nameLower.includes('wheelchair')) continue;
+        if (nameLower.includes('junior finals') || nameLower.includes('world tennis tour junior finals')) continue;
+        if (factSheetUrl && factSheetUrl.toLowerCase().includes('wheelchair')) continue;
 
         // Normalizace data na YYYY-MM-DD
         let startDate = dateStr;
@@ -120,6 +133,7 @@ async function main() {
           city,
           startDate,
           category: category || null,
+          factSheetUrl: factSheetUrl || null,
         });
       }
     }
@@ -131,16 +145,24 @@ async function main() {
         const nameEl = el.querySelector('a, [class*="name"], [class*="title"]');
         const name = (nameEl && nameEl.textContent || '').trim() || (el.textContent || '').trim().split('\n')[0];
         if (!name || name.length < 3) continue;
+        const nameLower = name.toLowerCase();
+        if (nameLower.includes('wheelchair')) continue;
+        if (nameLower.includes('junior finals') || nameLower.includes('world tennis tour junior finals')) continue;
         const link = el.querySelector('a[href*="tournament"], a[href*="factsheet"]');
         const tournamentId = link ? getTournamentIdFromLink(link) : null;
+        const factSheetUrl = (link && link.href && link.href.includes('itftennis') && (link.href.includes('/tournament/') || link.href.includes('factsheet'))) ? link.href : null;
+        if (factSheetUrl && factSheetUrl.toLowerCase().includes('wheelchair')) continue;
         const text = el.innerText || '';
-        const dateMatch = text.match(/(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})|(\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2})/);
-        const dateStr = dateMatch ? dateMatch[0] : '';
+        const allDates = text.match(/(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})|(\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2})/g);
+        const dateStr = allDates && allDates.length ? allDates[allDates.length - 1] : '';
         let startDate = dateStr;
         const dMatch = dateStr.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
         if (dMatch) {
           const [, d, m, y] = dMatch;
           startDate = `${y.length === 2 ? '20' + y : y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+        } else {
+          const ymd = dateStr.match(/(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/);
+          if (ymd) startDate = `${ymd[1]}-${ymd[2].padStart(2, '0')}-${ymd[3].padStart(2, '0')}`;
         }
         const cityMatch = text.match(/(?:City|Town|Venue)[:\s]*([A-Za-z\s,]+)/i);
         const city = (cityMatch && cityMatch[1] && cityMatch[1].trim()) || 'N/A';
@@ -148,7 +170,7 @@ async function main() {
         const category = (catMatch && catMatch[1]) || null;
         if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) continue;
         const tournamentKey = tournamentId || `itf-juniors-${slug(name)}-${startDate}`;
-        out.push({ tournamentKey, tournamentName: name, city, startDate, category });
+        out.push({ tournamentKey, tournamentName: name, city, startDate, category, factSheetUrl });
       }
     }
 
@@ -161,6 +183,9 @@ async function main() {
       for (const a of links) {
         const name = (a.textContent || '').trim();
         if (!name || name.length < 3 || name.length > 150) continue;
+        const nameLower = name.toLowerCase();
+        if (nameLower.includes('wheelchair')) continue;
+        if (nameLower.includes('junior finals') || nameLower.includes('world tennis tour junior finals')) continue;
         const tournamentId = getTournamentIdFromLink(a);
         const key = tournamentId || slug(name);
         if (seen.has(key)) continue;
@@ -170,8 +195,8 @@ async function main() {
         let city = 'N/A';
         if (row) {
           const rowText = row.innerText || '';
-          const dm = rowText.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})|(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/);
-          if (dm) dateStr = dm[0];
+          const allDm = rowText.match(/(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})|(\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2})/g);
+          if (allDm && allDm.length) dateStr = allDm[allDm.length - 1];
           const cm = rowText.match(/(?:City|Town|Venue|Location)[:\s]*([A-Za-z\s,\-]+?)(?:\n|$|J\d|Category)/i);
           if (cm) city = cm[1].trim();
         }
@@ -188,12 +213,15 @@ async function main() {
         }
         if (!startDate) continue;
         const category = (row && (row.innerText || '').match(/\b(J\d+)\b/i)) ? row.innerText.match(/\b(J\d+)\b/i)[1] : null;
+        const factSheetUrl = (a.href && a.href.includes('itftennis') && (a.href.includes('/tournament/') || a.href.includes('factsheet'))) ? a.href : null;
+        if (factSheetUrl && (factSheetUrl.toLowerCase().includes('wheelchair') || factSheetUrl.toLowerCase().includes('junior-finals') || factSheetUrl.toLowerCase().includes('jm-chn'))) continue;
         out.push({
           tournamentKey: tournamentId || `itf-juniors-${key}-${startDate}`,
           tournamentName: name,
           city,
           startDate,
           category,
+          factSheetUrl,
         });
       }
     }

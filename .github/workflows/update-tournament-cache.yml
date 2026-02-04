@@ -1,7 +1,7 @@
-# Každý měsíc stáhne turnaje z ITF Juniors na 3 měsíce dopředu a naimportuje je do Supabase tournament_cache.
-# Spouští se 1. v měsíci ve 3:00 UTC (4:00 / 5:00 CET podle DST). Lze spustit i ručně (Run workflow).
+# Každý měsíc přidá turnaje z ITF Juniors: první běh stáhne 3 měsíce, další běhy přidají jeden měsíc.
+# Stav se ukládá do cache (tournament-cache-state). Spouští se 1. v měsíci ve 3:00 UTC.
 
-name: Update tournament cache (3 months)
+name: Update tournament cache (accumulate months)
 
 on:
   schedule:
@@ -27,12 +27,38 @@ jobs:
       - name: Install Chromium dependencies (Puppeteer)
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
-            libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
-            libgbm1 libasound2 libpango-1.0-0 libcairo2
+          sudo apt-get install -y --no-install-recommends \
+            libasound2 libatk1.0-0 libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 \
+            libfontconfig1 libgcc1 libgdk-pixbuf2.0-0 libglib2.0-0 libgtk-3-0 \
+            libnspr4 libnss3 libpango-1.0-0 libpangocairo-1.0-0 libstdc++6 \
+            libx11-6 libx11-xcb1 libxcb1 libxcomposite1 libxcursor1 libxdamage1 \
+            libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 libxss1 libxtst6 \
+            libdrm2 libgbm1 libatk-bridge2.0-0 \
+            ca-certificates fonts-liberation xdg-utils wget
 
-      - name: Set 3 months (M1, M2, M3)
+      - name: Restore tournament cache state
+        uses: actions/cache/restore@v4
+        with:
+          path: data
+          key: tournament-cache-state
+
+      - name: Prepare data dir
+        run: mkdir -p data
+
+      - name: Decide mode and set next month
+        id: mode
+        run: |
+          if [ -f data/tournament-cache-state.json ]; then
+            echo "mode=incremental" >> $GITHUB_OUTPUT
+            NEXT=$(node scripts/get-next-calendar-month.js data/tournament-cache-state.json | sed 's/^NEXT_MONTH=//')
+            echo "next_month=$NEXT" >> $GITHUB_OUTPUT
+          else
+            echo "mode=full" >> $GITHUB_OUTPUT
+            echo "next_month=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Full run – set 3 months (M1, M2, M3)
+        if: steps.mode.outputs.mode == 'full'
         id: months
         run: |
           node -e "
@@ -47,28 +73,52 @@ jobs:
           console.log('M3=' + m3);
           " >> $GITHUB_ENV
 
-      - name: Fetch month 1
+      - name: Full run – fetch month 1
+        if: steps.mode.outputs.mode == 'full'
         run: node scripts/fetch-calendar-itf-juniors.js "$M1"
 
-      - name: Merge baseline
+      - name: Full run – merge baseline
+        if: steps.mode.outputs.mode == 'full'
         run: cp data/tournament-cache.json data/all.json
 
-      - name: Fetch month 2
+      - name: Full run – fetch month 2
+        if: steps.mode.outputs.mode == 'full'
         run: node scripts/fetch-calendar-itf-juniors.js "$M2"
 
-      - name: Merge month 2
+      - name: Full run – merge month 2
+        if: steps.mode.outputs.mode == 'full'
         run: node scripts/merge-tournament-cache.js data/all.json data/tournament-cache.json data/all.json
 
-      - name: Fetch month 3
+      - name: Full run – fetch month 3
+        if: steps.mode.outputs.mode == 'full'
         run: node scripts/fetch-calendar-itf-juniors.js "$M3"
 
-      - name: Merge month 3 and prepare import file
+      - name: Full run – merge month 3 and finalize
+        if: steps.mode.outputs.mode == 'full'
         run: |
           node scripts/merge-tournament-cache.js data/all.json data/tournament-cache.json data/all.json
           cp data/all.json data/tournament-cache.json
+          cp data/all.json data/tournament-cache-state.json
+
+      - name: Incremental run – fetch next month only
+        if: steps.mode.outputs.mode == 'incremental'
+        run: node scripts/fetch-calendar-itf-juniors.js "${{ steps.mode.outputs.next_month }}"
+
+      - name: Incremental run – merge with state and finalize
+        if: steps.mode.outputs.mode == 'incremental'
+        run: |
+          node scripts/merge-tournament-cache.js data/tournament-cache-state.json data/tournament-cache.json data/all.json
+          cp data/all.json data/tournament-cache.json
+          cp data/all.json data/tournament-cache-state.json
 
       - name: Import to Supabase
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node scripts/import-tournament-cache.js data/tournament-cache.json
+
+      - name: Save tournament cache state to cache
+        uses: actions/cache/save@v4
+        with:
+          path: data
+          key: tournament-cache-state
