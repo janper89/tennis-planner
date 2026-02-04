@@ -18,6 +18,8 @@ export default function CoachPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [userEmail, setUserEmail] = useState<string>('');
+  const [userName, setUserName] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,10 +35,12 @@ export default function CoachPage() {
           return;
         }
 
+        setUserEmail(user.email!);
+
         // Get app_user record
         const { data: appUser } = await supabase
           .from('app_user')
-          .select('id')
+          .select('id, name')
           .eq('email', user.email!)
           .single();
 
@@ -45,6 +49,9 @@ export default function CoachPage() {
           return;
         }
 
+        const nameValue = appUser.name?.trim() || '';
+        setUserName(nameValue);
+
         // Get coach's players
         const { data: playersData } = await supabase
           .from('player')
@@ -52,8 +59,9 @@ export default function CoachPage() {
           .eq('coach_id', appUser.id)
           .order('name');
 
+        setPlayers(playersData || []);
+
         if (!playersData || playersData.length === 0) {
-          setPlayers([]);
           setEntries([]);
           setTournaments([]);
           setLoading(false);
@@ -85,7 +93,6 @@ export default function CoachPage() {
           .in('id', tournamentIds.length > 0 ? tournamentIds : ['00000000-0000-0000-0000-000000000000'])
           .order('datum', { ascending: true });
 
-        setPlayers(playersData);
         setEntries((entriesData as Entry[]) || []);
         setTournaments(tournamentsData || []);
       } catch (error) {
@@ -114,24 +121,13 @@ export default function CoachPage() {
     );
   }
 
-  if (!players || players.length === 0) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-8">
-        <div className="mx-auto max-w-7xl">
-          <h1 className="text-2xl font-bold">Trenér - Žádní hráči</h1>
-          <p className="mt-4 text-gray-600">
-            Zatím nemáš přiřazené žádné hráče.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <CoachDashboard
       players={players}
       entries={entries}
       tournaments={tournaments}
+      userEmail={userEmail}
+      userName={userName}
     />
   );
 }
