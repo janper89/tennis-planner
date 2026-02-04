@@ -673,7 +673,7 @@ export default function CoachDashboard({
                           className="mt-1"
                         />
                         <span className="text-sm">
-                          <span className="font-medium">{r.tournamentName}</span>
+                          <span className="font-medium">{r.name}</span>
                           <br />
                           {r.city} • {r.startDate}
                           {r.category && ` • ${r.category}`}
