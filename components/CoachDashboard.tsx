@@ -1017,6 +1017,30 @@ export default function CoachDashboard({
                                     </span>
                                   )}
                                 </p>
+                                {(entry.tournament.sign_in_deadline_text ||
+                                  entry.tournament.tournament_director_name ||
+                                  entry.tournament.official_ball) && (
+                                  <div className="mt-2 border-t border-gray-200 pt-2 text-xs text-gray-500">
+                                    {entry.tournament.sign_in_deadline_text && (
+                                      <p>
+                                        <span className="font-medium">Přihlášky:</span>{' '}
+                                        {entry.tournament.sign_in_deadline_text}
+                                      </p>
+                                    )}
+                                    {entry.tournament.tournament_director_name && (
+                                      <p>
+                                        <span className="font-medium">Ředitel:</span>{' '}
+                                        {entry.tournament.tournament_director_name}
+                                      </p>
+                                    )}
+                                    {entry.tournament.official_ball && (
+                                      <p>
+                                        <span className="font-medium">Míček:</span>{' '}
+                                        {entry.tournament.official_ball}
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                               <div className="flex gap-2">
                                 <button

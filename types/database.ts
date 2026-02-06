@@ -86,6 +86,10 @@ export interface Database {
           created_by: string | null
           created_at: string
           tournament_key: string | null
+          sign_in_deadline_text: string | null
+          withdrawal_deadline_text: string | null
+          tournament_director_name: string | null
+          official_ball: string | null
         }
         Insert: {
           id?: string
@@ -99,6 +103,10 @@ export interface Database {
           created_by?: string | null
           created_at?: string
           tournament_key?: string | null
+          sign_in_deadline_text?: string | null
+          withdrawal_deadline_text?: string | null
+          tournament_director_name?: string | null
+          official_ball?: string | null
         }
         Update: {
           id?: string
@@ -112,6 +120,10 @@ export interface Database {
           created_by?: string | null
           created_at?: string
           tournament_key?: string | null
+          sign_in_deadline_text?: string | null
+          withdrawal_deadline_text?: string | null
+          tournament_director_name?: string | null
+          official_ball?: string | null
         }
       }
       tournament_cache: {
@@ -129,6 +141,7 @@ export interface Database {
           entry_deadline: string | null
           withdrawal_deadline: string | null
           tournament_director_name: string | null
+          official_ball: string | null
         }
         Insert: {
           tournament_key: string
@@ -144,6 +157,7 @@ export interface Database {
           entry_deadline?: string | null
           withdrawal_deadline?: string | null
           tournament_director_name?: string | null
+          official_ball?: string | null
         }
         Update: {
           tournament_key?: string
@@ -159,6 +173,7 @@ export interface Database {
           entry_deadline?: string | null
           withdrawal_deadline?: string | null
           tournament_director_name?: string | null
+          official_ball?: string | null
         }
       }
       entry: {

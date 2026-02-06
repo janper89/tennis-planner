@@ -49,8 +49,13 @@ export const ADMIN_EMAILS = [
 
 V Supabase Dashboard:
 - **Authentication** → **URL Configuration**
-- **Site URL**: `http://localhost:3000/login` (pro vývoj)
-- **Redirect URLs**: přidej `http://localhost:3000/login`
+- **Site URL**: `http://localhost:3000` (pro vývoj) nebo tvá production URL
+- **Redirect URLs** – přidej všechny adresy, kam má Supabase přesměrovávat:
+  - `http://localhost:3000/login`
+  - `http://localhost:3000/password/reset` (nutné pro „Zapomněli jste heslo?“)
+  - V produkci také např. `https://tva-domena.cz/password/reset`
+
+Bez `/password/reset` v Redirect URLs Supabase nepošle odkaz na reset hesla nebo bude odkaz neplatný.
 
 ### 5. Spuštění
 
@@ -77,6 +82,11 @@ Aplikace poběží na [http://localhost:3000](http://localhost:3000)
 ### Chyba při přihlášení
 - Zkontroluj `Site URL` v Supabase
 - Ověř, že `.env.local` obsahuje správné hodnoty
+
+### Email na reset hesla nepřichází
+1. **Redirect URL**: V Supabase → **Authentication** → **URL Configuration** → **Redirect URLs** musí být přesně ta adresa, na které běží aplikace (např. `http://localhost:3000/password/reset` nebo tvá production URL). Bez toho Supabase odkaz v emailu nevygeneruje správně.
+2. **Spam**: Zkontroluj složku spam / hromadná pošta.
+3. **Výchozí SMTP**: Supabase posílá emaily přes vlastní server (s limity). Pokud emaily stále nedorazí, nastav v Supabase → **Project Settings** → **Auth** → **SMTP** vlastní SMTP (např. Resend, SendGrid, nebo SMTP tvého poskytovatele).
 
 ### RLS chyby
 - Zkontroluj, že SQL schéma bylo správně nahráno

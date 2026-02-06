@@ -190,16 +190,16 @@ export default function LoginPage() {
           >
             {loading ? 'Přihlašování...' : 'Přihlásit se'}
           </button>
-        </form>
 
-        <p className="mt-6 text-center text-xs text-gray-500">
-          <Link
-            href="/password/reset"
-            className="text-emerald-600 hover:text-emerald-700 hover:underline"
-          >
-            Zapomněli jste heslo?
-          </Link>
-        </p>
+          <p className="relative z-10 text-center text-sm text-gray-500">
+            <Link
+              href="/password/reset"
+              className="inline-block py-2 px-1 text-emerald-600 underline hover:text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-white rounded"
+            >
+              Zapomněli jste heslo?
+            </Link>
+          </p>
+        </form>
       </div>
     </div>
   );

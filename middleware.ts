@@ -3,7 +3,13 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 const PROTECTED_PREFIXES = ['/parent', '/coach', '/manager', '/password'];
 
+/** Cesty, které jsou dostupné i bez přihlášení (např. reset hesla). */
+const PUBLIC_PATHS = ['/password/reset'];
+
 function isProtectedPath(pathname: string): boolean {
+  if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
+    return false;
+  }
   return PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 

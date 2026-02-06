@@ -1204,6 +1204,30 @@ export default function ParentDashboard({
                                     )}
                                   </div>
                                 )}
+                                {entry.tournament.sign_in_deadline_text && (
+                                  <div>
+                                    <span className="font-medium">
+                                      Přihlášky (ITF):
+                                    </span>{' '}
+                                    {entry.tournament.sign_in_deadline_text}
+                                  </div>
+                                )}
+                                {entry.tournament.tournament_director_name && (
+                                  <div>
+                                    <span className="font-medium">
+                                      Ředitel:
+                                    </span>{' '}
+                                    {entry.tournament.tournament_director_name}
+                                  </div>
+                                )}
+                                {entry.tournament.official_ball && (
+                                  <div>
+                                    <span className="font-medium">
+                                      Míček:
+                                    </span>{' '}
+                                    {entry.tournament.official_ball}
+                                  </div>
+                                )}
                               </div>
                               {entry.poznamka_rodic && (
                                 <div className="mt-2 text-sm text-gray-600">

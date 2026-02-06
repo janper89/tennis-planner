@@ -45,13 +45,32 @@ Aby přihlášení (magic link) na webovce fungovalo, musí Supabase znát produ
 2. **Site URL**: nastav na adresu od Vercelu, např. `https://tennis-club-xxx.vercel.app` (nebo vlastní doména).
 3. Do **Redirect URLs** přidej:
    - `https://tennis-club-xxx.vercel.app/**`
+   - `https://tennis-club-xxx.vercel.app/password/reset` (pro „Zapomněli jste heslo?“)
    - `https://tvadomena.cz/**` (pokud budeš používat vlastní doménu)
+   - `https://tvadomena.cz/password/reset` (pro reset hesla na vlastní doméně)
 
 Po uložení zkus znovu přihlášení na živé stránce.
 
 ## 5. Vlastní doména (volitelně)
 
 V projektu na Vercelu: **Settings** → **Domains** → přidej svou doménu a podle návodu nastav DNS (A/CNAME záznamy u poskytovatele domény). V Supabase pak v Redirect URLs a Site URL použij tuto doménu.
+
+## Nasazení přes Vercel CLI (alternativa)
+
+Místo importu přes web můžeš nasadit z příkazové řádky:
+
+```bash
+# Jednorázově se přihlásit (otevře prohlížeč)
+npx vercel login
+
+# Nasazení (preview URL)
+npx vercel
+
+# Nasazení do produkce
+npx vercel --prod
+```
+
+Před prvním nasazením nastav env proměnné v Vercel Dashboard (Settings → Environment Variables) nebo je zadej při `vercel` (prompt). Po `vercel link` se projekt propojí s existujícím Vercel projektem.
 
 ## Shrnutí
 

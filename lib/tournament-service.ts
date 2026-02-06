@@ -20,6 +20,7 @@ type TournamentCacheRow = {
   entry_deadline?: string | null;
   withdrawal_deadline?: string | null;
   tournament_director_name?: string | null;
+  official_ball?: string | null;
 };
 
 /**
@@ -38,6 +39,7 @@ export interface ITFTournamentSearchResult {
   entryDeadline?: string | null;
   withdrawalDeadline?: string | null;
   tournamentDirectorName?: string | null;
+  officialBall?: string | null;
 }
 
 function mapCacheRowToSearchResult(row: TournamentCacheRow): ITFTournamentSearchResult {
@@ -54,6 +56,7 @@ function mapCacheRowToSearchResult(row: TournamentCacheRow): ITFTournamentSearch
     entryDeadline: row.entry_deadline ?? undefined,
     withdrawalDeadline: row.withdrawal_deadline ?? undefined,
     tournamentDirectorName: row.tournament_director_name ?? undefined,
+    officialBall: row.official_ball ?? undefined,
   };
 }
 
@@ -100,7 +103,7 @@ export async function searchTournamentByName(
 
     const { data, error } = await supabase
       .from('tournament_cache')
-      .select('tournament_key, name, city, start_date, category, country, venue, end_date, draw_size, entry_deadline, withdrawal_deadline, tournament_director_name')
+      .select('tournament_key, name, city, start_date, category, country, venue, end_date, draw_size, entry_deadline, withdrawal_deadline, tournament_director_name, official_ball')
       .ilike('name', `%${query}%`)
       .limit(1)
       .maybeSingle();
@@ -138,7 +141,7 @@ export async function searchTournamentsByName(
 
     const { data, error } = await supabase
       .from('tournament_cache')
-      .select('tournament_key, name, city, start_date, category, country, venue, end_date, draw_size, entry_deadline, withdrawal_deadline, tournament_director_name')
+      .select('tournament_key, name, city, start_date, category, country, venue, end_date, draw_size, entry_deadline, withdrawal_deadline, tournament_director_name, official_ball')
       .ilike('name', `%${query}%`)
       .order('start_date', { ascending: true })
       .limit(limit);
@@ -211,6 +214,10 @@ export async function createTournament(
       datum: tournamentData.startDate,
       tournament_key: tournamentData.tournamentKey,
       created_by: userId,
+      sign_in_deadline_text: tournamentData.entryDeadline ?? null,
+      withdrawal_deadline_text: tournamentData.withdrawalDeadline ?? null,
+      tournament_director_name: tournamentData.tournamentDirectorName ?? null,
+      official_ball: tournamentData.officialBall ?? null,
       // entry_deadline and withdraw_deadline are calculated by trigger
     };
 

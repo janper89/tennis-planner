@@ -184,9 +184,12 @@ function PasswordResetContent() {
             )}
 
             {success && (
-              <div className="rounded-lg bg-green-50 p-4 text-sm text-green-700">
-                Email s odkazem na reset hesla byl odeslán. Zkontroluj svou
-                emailovou schránku.
+              <div className="space-y-2 rounded-lg bg-green-50 p-4 text-sm text-green-700">
+                <p>Email s odkazem na reset hesla byl odeslán. Zkontroluj svou emailovou schránku.</p>
+                <p className="text-green-600">
+                  Nepřišel? Zkontroluj <strong>spam</strong>. V Supabase Dashboard musí být v Authentication → URL Configuration → Redirect URLs adresa{' '}
+                  <code className="rounded bg-green-100 px-1">{typeof window !== 'undefined' ? window.location.origin : ''}/password/reset</code>.
+                </p>
               </div>
             )}
 
