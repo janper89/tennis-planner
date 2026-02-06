@@ -88,6 +88,11 @@ Aplikace poběží na [http://localhost:3000](http://localhost:3000)
 2. **Spam**: Zkontroluj složku spam / hromadná pošta.
 3. **Výchozí SMTP**: Supabase posílá emaily přes vlastní server (s limity). Pokud emaily stále nedorazí, nastav v Supabase → **Project Settings** → **Auth** → **SMTP** vlastní SMTP (např. Resend, SendGrid, nebo SMTP tvého poskytovatele).
 
+### Odkaz na reset hesla vypršel (otp_expired)
+- Odkaz v emailu platí jen **omezenou dobu** (v Supabase většinou 1 hodina) a lze ho použít **jen jednou**. Po kliknutí se zobrazí srozumitelná hláška a formulář na vyžádání nového odkazu.
+- Pokud e-mailový klient nebo antivirus odkazy v mailu „proklikává“ před uživatelem, token se spotřebuje a pak už odkaz nefunguje. Řešení: požádat o nový odkaz a použít ho v prohlížeči co nejdřív.
+- Platnost lze v Supabase prodloužit: **Authentication** → **Email Templates** (nebo v konfiguraci Auth) – pokud je tam možnost nastavit platnost odkazu (např. „Secure email change link expiry“ nebo podobně).
+
 ### RLS chyby
 - Zkontroluj, že SQL schéma bylo správně nahráno
 - Ověř, že uživatel má správnou roli v `app_user`

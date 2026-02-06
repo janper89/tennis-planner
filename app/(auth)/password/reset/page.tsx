@@ -15,19 +15,28 @@ function PasswordResetContent() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [step, setStep] = useState<'request' | 'reset'>('request');
+  const [linkExpired, setLinkExpired] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
-    const checkRecovery = () => {
-      const hash = window.location.hash;
-      if (hash) {
-        const params = new URLSearchParams(hash.substring(1));
-        const type = params.get('type');
-        if (type === 'recovery') {
-          setStep('reset');
-          return true;
-        }
+    const hash = window.location.hash;
+    if (hash) {
+      const params = new URLSearchParams(hash.substring(1));
+      const errorCode = params.get('error_code') ?? params.get('error');
+      const code = params.get('code');
+      if (errorCode === 'otp_expired' || code === '403' || params.get('error_description')?.includes('expired')) {
+        setLinkExpired(true);
+        setStep('request');
+        window.history.replaceState(null, '', window.location.pathname);
+        return;
       }
+      const type = params.get('type');
+      if (type === 'recovery') {
+        setStep('reset');
+        return;
+      }
+    }
+    const checkRecovery = () => {
       try {
         const queryType = searchParams.get('type');
         if (queryType === 'recovery') {
@@ -39,7 +48,6 @@ function PasswordResetContent() {
       }
       return false;
     };
-
     checkRecovery();
 
     const {
@@ -177,6 +185,12 @@ function PasswordResetContent() {
 
         {step === 'request' ? (
           <form onSubmit={handleRequestReset} className="mt-8 space-y-6">
+            {linkExpired && (
+              <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800">
+                <p className="font-medium">Odkaz vypršel nebo byl již použit.</p>
+                <p className="mt-1">Odkaz na reset hesla platí jen omezenou dobu (obvykle 1 hodinu) a lze ho použít jen jednou. Zadej e‑mail níže a pošleme ti nový odkaz.</p>
+              </div>
+            )}
             {error && (
               <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700">
                 {error}
