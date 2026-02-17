@@ -90,6 +90,7 @@ export interface Database {
           withdrawal_deadline_text: string | null
           tournament_director_name: string | null
           official_ball: string | null
+          draw_size: string | null
         }
         Insert: {
           id?: string
@@ -107,6 +108,7 @@ export interface Database {
           withdrawal_deadline_text?: string | null
           tournament_director_name?: string | null
           official_ball?: string | null
+          draw_size?: string | null
         }
         Update: {
           id?: string
@@ -124,6 +126,7 @@ export interface Database {
           withdrawal_deadline_text?: string | null
           tournament_director_name?: string | null
           official_ball?: string | null
+          draw_size?: string | null
         }
       }
       tournament_cache: {

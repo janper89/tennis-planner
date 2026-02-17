@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
   formatDate,
+  formatTournamentName,
   getWeekNumber,
   getWeekRange,
   getAgeFromBirthDate,
@@ -980,7 +981,7 @@ export default function ParentDashboard({
                   type="text"
                   name="nazev"
                   required
-                  defaultValue={editingEntry?.tournament.nazev || ''}
+                  defaultValue={editingEntry ? formatTournamentName(editingEntry.tournament.nazev) : ''}
                   onChange={() => setSearchResults(null)}
                   placeholder={
                     useAutoSearch && !editingEntry
@@ -1161,7 +1162,7 @@ export default function ParentDashboard({
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
                                 <h4 className="font-semibold">
-                                  {entry.tournament.nazev}
+                                  {formatTournamentName(entry.tournament.nazev)}
                                 </h4>
                                 {entry.status === 'odehrano' && (
                                   <span className="rounded bg-green-600 px-2 py-0.5 text-xs font-medium text-white">
@@ -1226,6 +1227,14 @@ export default function ParentDashboard({
                                       Míček:
                                     </span>{' '}
                                     {entry.tournament.official_ball}
+                                  </div>
+                                )}
+                                {entry.tournament.draw_size && (
+                                  <div>
+                                    <span className="font-medium">
+                                      Draw:
+                                    </span>{' '}
+                                    {entry.tournament.draw_size}
                                   </div>
                                 )}
                               </div>

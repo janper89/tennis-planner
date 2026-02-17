@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import {
   formatDate,
+  formatTournamentName,
   getWeekNumber,
   getWeekRange,
   getAgeFromBirthDate,
@@ -354,6 +355,60 @@ export default function CoachDashboard({
 
       // Refresh data
       window.location.reload();
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Došlo k chybě');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUnregisterEntry = async (entryId: string) => {
+    if (!confirm('Opravdu chceš odhlásit tuto přihlášku?')) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('entry')
+        .update({ status: 'odhlasen' })
+        .eq('id', entryId);
+
+      if (error) {
+        alert('Chyba při odhlašování: ' + error.message);
+        return;
+      }
+
+      setEntries(
+        entries.map((e) =>
+          e.id === entryId ? { ...e, status: 'odhlasen' as const } : e
+        )
+      );
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Došlo k chybě');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRestoreEntry = async (entryId: string) => {
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('entry')
+        .update({ status: 'planovano' })
+        .eq('id', entryId);
+
+      if (error) {
+        alert('Chyba při obnovení: ' + error.message);
+        return;
+      }
+
+      setEntries(
+        entries.map((e) =>
+          e.id === entryId ? { ...e, status: 'planovano' as const } : e
+        )
+      );
     } catch (error) {
       console.error('Error:', error);
       alert('Došlo k chybě');
@@ -860,7 +915,7 @@ export default function CoachDashboard({
                   return (
                     <tr key={tournament.id} className="hover:bg-gray-50">
                       <td className="sticky left-0 z-10 whitespace-nowrap bg-white px-4 py-3 text-sm">
-                        <div className="font-medium">{tournament.nazev}</div>
+                        <div className="font-medium">{formatTournamentName(tournament.nazev)}</div>
                         <div className="text-xs text-gray-500">
                           {formatDate(tournament.datum)} • {tournament.misto}
                         </div>
@@ -875,19 +930,48 @@ export default function CoachDashboard({
                             className="px-4 py-3 text-center text-sm"
                           >
                             {entry ? (
-                              <div className="inline-block rounded-md bg-blue-50 px-2 py-1">
-                                <div className="text-xs font-medium text-blue-900">
+                              <div
+                                className={`inline-block rounded-md px-2 py-1 ${
+                                  entry.status === 'odhlasen'
+                                    ? 'bg-gray-100'
+                                    : 'bg-blue-50'
+                                }`}
+                              >
+                                <div
+                                  className={`text-xs font-medium ${
+                                    entry.status === 'odhlasen'
+                                      ? 'text-gray-600'
+                                      : 'text-blue-900'
+                                  }`}
+                                >
                                   {entry.tournament.misto}
                                 </div>
-                                <div className="text-xs text-blue-700">
+                                <div
+                                  className={`text-xs ${
+                                    entry.status === 'odhlasen'
+                                      ? 'text-gray-500'
+                                      : 'text-blue-700'
+                                  }`}
+                                >
                                   {entry.tournament.kategorie}
                                 </div>
-                                <div className="text-xs font-semibold text-blue-900">
+                                <div
+                                  className={`text-xs font-semibold ${
+                                    entry.status === 'odhlasen'
+                                      ? 'text-gray-600'
+                                      : 'text-blue-900'
+                                  }`}
+                                >
                                   P{entry.priority}
                                 </div>
                                 {entry.status === 'odehrano' && (
                                   <div className="mt-1 text-xs text-green-600">
                                     Odehráno
+                                  </div>
+                                )}
+                                {entry.status === 'odhlasen' && (
+                                  <div className="mt-1 text-xs text-gray-500">
+                                    Odhlášeno
                                   </div>
                                 )}
                               </div>
@@ -946,7 +1030,7 @@ export default function CoachDashboard({
                                     type="text"
                                     name="nazev"
                                     required
-                                    defaultValue={entry.tournament.nazev}
+                                    defaultValue={formatTournamentName(entry.tournament.nazev)}
                                     className="mt-0.5 block w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
                                   />
                                 </div>
@@ -1002,7 +1086,7 @@ export default function CoachDashboard({
                             <div className="flex items-center justify-between rounded-md bg-gray-50 p-3">
                               <div>
                                 <p className="font-medium">
-                                  {entry.tournament.nazev}
+                                  {formatTournamentName(entry.tournament.nazev)}
                                 </p>
                                 <p className="text-sm text-gray-600">
                                   {formatDate(entry.tournament.datum)} •{' '}
@@ -1016,10 +1100,16 @@ export default function CoachDashboard({
                                       (Odehráno)
                                     </span>
                                   )}
+                                  {entry.status === 'odhlasen' && (
+                                    <span className="ml-2 rounded bg-gray-200 px-1.5 py-0.5 text-xs font-medium text-gray-600">
+                                      Odhlášeno
+                                    </span>
+                                  )}
                                 </p>
                                 {(entry.tournament.sign_in_deadline_text ||
                                   entry.tournament.tournament_director_name ||
-                                  entry.tournament.official_ball) && (
+                                  entry.tournament.official_ball ||
+                                  entry.tournament.draw_size) && (
                                   <div className="mt-2 border-t border-gray-200 pt-2 text-xs text-gray-500">
                                     {entry.tournament.sign_in_deadline_text && (
                                       <p>
@@ -1039,10 +1129,16 @@ export default function CoachDashboard({
                                         {entry.tournament.official_ball}
                                       </p>
                                     )}
+                                    {entry.tournament.draw_size && (
+                                      <p>
+                                        <span className="font-medium">Draw:</span>{' '}
+                                        {entry.tournament.draw_size}
+                                      </p>
+                                    )}
                                   </div>
                                 )}
                               </div>
-                              <div className="flex gap-2">
+                              <div className="flex flex-wrap gap-2">
                                 <button
                                   onClick={() => setEditingEntryForTournament(entry)}
                                   disabled={loading}
@@ -1058,6 +1154,25 @@ export default function CoachDashboard({
                                   >
                                     Odehráno
                                   </button>
+                                )}
+                                {entry.status === 'odhlasen' ? (
+                                  <button
+                                    onClick={() => handleRestoreEntry(entry.id)}
+                                    disabled={loading}
+                                    className="rounded-md bg-blue-100 px-3 py-1 text-sm text-blue-700 hover:bg-blue-200 disabled:opacity-50"
+                                  >
+                                    Obnovit
+                                  </button>
+                                ) : (
+                                  entry.status !== 'odehrano' && (
+                                    <button
+                                      onClick={() => handleUnregisterEntry(entry.id)}
+                                      disabled={loading}
+                                      className="rounded-md bg-orange-100 px-3 py-1 text-sm text-orange-700 hover:bg-orange-200 disabled:opacity-50"
+                                    >
+                                      Odhlásit
+                                    </button>
+                                  )
                                 )}
                                 <button
                                   onClick={() => handleDeleteEntry(entry.id)}

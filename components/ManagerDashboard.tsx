@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import {
   formatDate,
+  formatTournamentName,
   getWeekNumber,
   getAgeFromBirthDate,
   getMaxTournamentsForAge,
@@ -388,11 +389,18 @@ export default function ManagerDashboard({
                   entriesByTournament[tournament.id] || [];
                 return (
                   <tr key={tournament.id} className="hover:bg-gray-50">
-                    <td className="sticky left-0 z-10 whitespace-nowrap bg-white px-4 py-3 text-sm">
-                      <div className="font-medium">{tournament.nazev}</div>
+                    <td className="sticky left-0 z-10 bg-white px-4 py-3 text-sm">
+                      <div className="font-medium">{formatTournamentName(tournament.nazev)}</div>
                       <div className="text-xs text-gray-500">
                         {formatDate(tournament.datum)} • {tournament.misto}
                       </div>
+                      {(tournament.draw_size || tournament.official_ball) && (
+                        <div className="mt-1 text-xs text-gray-400">
+                          {tournament.draw_size && <span>Draw: {tournament.draw_size}</span>}
+                          {tournament.draw_size && tournament.official_ball && ' · '}
+                          {tournament.official_ball && <span>Míček: {tournament.official_ball}</span>}
+                        </div>
+                      )}
                     </td>
                     {filteredPlayers.map((player) => {
                       const entry = tournamentEntries.find(

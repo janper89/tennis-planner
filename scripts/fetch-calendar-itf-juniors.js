@@ -4,8 +4,11 @@
  *
  * Použití:
  *   node scripts/fetch-calendar-itf-juniors.js [YYYY-MM]
+ *   node scripts/fetch-calendar-itf-juniors.js [YYYY-MM] --months=3
  *
- * Bez argumentu: aktuální měsíc. Příklad: 2026-02
+ * Bez argumentu: aktuální měsíc + 3 měsíce dopředu (např. únor → únor, březen, duben).
+ * S --months=N: stáhne N měsíců od zadaného (nebo aktuálního) měsíce.
+ * Příklad: 2026-02 --months=3 → únor, březen, duben 2026.
  *
  * Vyžaduje: npm install (puppeteer je v devDependencies)
  */
@@ -16,47 +19,44 @@ const path = require('path');
 const BASE_URL = 'https://www.itftennis.com/en/tournament-calendar/world-tennis-tour-juniors-calendar/';
 const DEFAULT_START = new Date().toISOString().slice(0, 7); // YYYY-MM
 
-async function main() {
-  const startParam = process.argv[2] || DEFAULT_START;
-  const url = `${BASE_URL}?categories=All&startdate=${startParam}`;
-
-  let puppeteer;
-  try {
-    puppeteer = require('puppeteer');
-  } catch (e) {
-    console.error('Nainstaluj Puppeteer: npm install puppeteer --save-dev');
-    process.exit(1);
+/** Vrátí pole YYYY-MM pro N měsíců od startMonth */
+function getMonthsToFetch(startMonth, count) {
+  const [y, m] = startMonth.split('-').map(Number);
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const month = m + i;
+    const year = y + Math.floor((month - 1) / 12);
+    const monthNorm = ((month - 1) % 12) + 1;
+    out.push(`${year}-${String(monthNorm).padStart(2, '0')}`);
   }
+  return out;
+}
 
-  console.log('Načítám kalendář:', url);
-  const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
-  const launchOptions = {
-    headless: true,
-    ...(isCI && {
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-      ],
-    }),
-    ...(process.env.PUPPETEER_EXECUTABLE_PATH && {
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
-    }),
-  };
-  const browser = await puppeteer.launch(launchOptions);
-  const page = await browser.newPage();
-  await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+function parseArgs() {
+  const args = process.argv.slice(2);
+  const monthsArg = args.find((a) => a.startsWith('--months='));
+  const months = monthsArg ? parseInt(monthsArg.split('=')[1], 10) : 3;
+  const startArg = args.find((a) => !a.startsWith('--') && /^\d{4}-\d{2}$/.test(a));
+  const startMonth = startArg || DEFAULT_START;
+  return { startMonth, months };
+}
+
+async function fetchMonth(page, startMonth) {
+  const url = `${BASE_URL}?categories=All&startdate=${startMonth}`;
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  // SPA: počkat na vykreslení obsahu (tabulka, odkazy na turnaje)
   await new Promise((r) => setTimeout(r, 6000));
   try {
     await page.waitForSelector('table, [class*="tournament"], a[href*="tournament"], a[href*="factsheet"]', { timeout: 15000 });
   } catch (_) {}
 
-  const tournaments = await page.evaluate((startMonth) => {
+  return page.evaluate((startMonth) => {
     const out = [];
     const slug = (s) => (s || '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
+
+    function normalizeTournamentName(n) {
+      if (!n || typeof n !== 'string') return n || '';
+      return n.replace(/^([JW]\d+\s+[A-Za-z]+)\1/i, '$1').trim();
+    }
 
     // Odkaz může obsahovat tournamentId (IPIN factsheet)
     function getTournamentIdFromLink(a) {
@@ -123,6 +123,7 @@ async function main() {
         if (!city) city = 'N/A';
 
         if (!name) continue;
+        name = normalizeTournamentName(name);
         const nameLower = name.toLowerCase();
         if (nameLower.includes('wheelchair')) continue;
         if (nameLower.includes('junior finals') || nameLower.includes('world tennis tour junior finals')) continue;
@@ -158,8 +159,9 @@ async function main() {
       const blocks = document.querySelectorAll('[class*="tournament"], [class*="event"], [data-tournament]');
       for (const el of blocks) {
         const nameEl = el.querySelector('a, [class*="name"], [class*="title"]');
-        const name = (nameEl && nameEl.textContent || '').trim() || (el.textContent || '').trim().split('\n')[0];
+        let name = (nameEl && nameEl.textContent || '').trim() || (el.textContent || '').trim().split('\n')[0];
         if (!name || name.length < 3) continue;
+        name = normalizeTournamentName(name);
         const nameLower = name.toLowerCase();
         if (nameLower.includes('wheelchair')) continue;
         if (nameLower.includes('junior finals') || nameLower.includes('world tennis tour junior finals')) continue;
@@ -196,8 +198,9 @@ async function main() {
       const links = document.querySelectorAll('a[href*="tournament"], a[href*="factsheet"]');
       const seen = new Set();
       for (const a of links) {
-        const name = (a.textContent || '').trim();
+        let name = (a.textContent || '').trim();
         if (!name || name.length < 3 || name.length > 150) continue;
+        name = normalizeTournamentName(name);
         const nameLower = name.toLowerCase();
         if (nameLower.includes('wheelchair')) continue;
         if (nameLower.includes('junior finals') || nameLower.includes('world tennis tour junior finals')) continue;
@@ -242,35 +245,67 @@ async function main() {
     }
 
     return out;
-  }, startParam);
+  }, startMonth);
+}
 
-  // Deduplikace podle tournamentKey
-  const byKey = new Map();
-  for (const t of tournaments) {
-    if (t.tournamentName && t.startDate) byKey.set(t.tournamentKey, t);
-  }
-  const list = Array.from(byKey.values());
+async function main() {
+  const { startMonth, months } = parseArgs();
+  const monthsToFetch = getMonthsToFetch(startMonth, months);
 
-  if (list.length === 0) {
-    const debugPath = path.join(process.cwd(), 'data', 'calendar-debug.html');
-    try {
-      const html = await page.evaluate(() => document.documentElement.outerHTML);
-      fs.mkdirSync(path.dirname(debugPath), { recursive: true });
-      fs.writeFileSync(debugPath, html, 'utf8');
-      console.warn('Žádné turnaje nebyly rozpoznány. Pro kontrolu struktury stránky byl uložen soubor:', debugPath);
-    } catch (e) {
-      console.warn('Žádné turnaje nebyly rozpoznány. Stránka mohla změnit strukturu – uprav selektory ve skriptu.');
-    }
-    await browser.close();
+  let puppeteer;
+  try {
+    puppeteer = require('puppeteer');
+  } catch (e) {
+    console.error('Nainstaluj Puppeteer: npm install puppeteer --save-dev');
     process.exit(1);
+  }
+
+  const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+  const launchOptions = {
+    headless: true,
+    ...(isCI && {
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+      ],
+    }),
+    ...(process.env.PUPPETEER_EXECUTABLE_PATH && {
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+    }),
+  };
+  const browser = await puppeteer.launch(launchOptions);
+  const page = await browser.newPage();
+  await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+
+  const byKey = new Map();
+  for (let i = 0; i < monthsToFetch.length; i++) {
+    const m = monthsToFetch[i];
+    console.log(`Načítám kalendář [${i + 1}/${monthsToFetch.length}]: ${m}`);
+    try {
+      const tournaments = await fetchMonth(page, m);
+      for (const t of tournaments) {
+        if (t.tournamentName && t.startDate) byKey.set(t.tournamentKey, t);
+      }
+    } catch (e) {
+      console.warn('Chyba pro měsíc', m, ':', e.message);
+    }
   }
 
   await browser.close();
 
+  const list = Array.from(byKey.values());
+
+  if (list.length === 0) {
+    console.error('Žádné turnaje nebyly staženy. Zkontroluj strukturu ITF stránky.');
+    process.exit(1);
+  }
+
   const outPath = path.join(process.cwd(), 'data', 'tournament-cache.json');
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, JSON.stringify(list, null, 2), 'utf8');
-  console.log('OK: uloženo', list.length, 'turnajů do', outPath);
+  console.log('OK: uloženo', list.length, 'turnajů do', outPath, `(${monthsToFetch.join(', ')})`);
   console.log('Import do DB: node scripts/import-tournament-cache.js');
 }
 

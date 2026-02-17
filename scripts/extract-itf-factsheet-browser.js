@@ -15,10 +15,13 @@
 (function () {
   'use strict';
 
+  // Bezpečný regex.test – některé ITF stránky přepisují RegExp.prototype
+  const safeTest = (re, s) => (re && typeof re.test === 'function' ? re.test(String(s || '')) : false);
+
   const main = document.querySelector('main');
   const root = main || document.body;
 
-  const data = {
+  let data = {
     tournamentKey: null,
     tournamentName: null,
     city: null,
@@ -46,16 +49,31 @@
     tournamentKeyFactsheet: null,
   };
 
-  // --- tournamentKey z URL (poslední segment, nebo před záložkou draws-and-results / fact-sheet atd.) ---
+  // --- Parsování z URL: /en/tournament/j100-loughborough/gbr/2026/j-j100-gbr-2026-004/ ---
   const pathSegments = window.location.pathname.split('/').filter(Boolean);
-  if (pathSegments.length > 0) {
-    const last = pathSegments[pathSegments.length - 1];
+  const tournamentIdx = pathSegments.indexOf('tournament');
+  let urlCategory = null;
+  let urlCity = null;
+  let urlCountry = null;
+
+  if (tournamentIdx >= 0 && pathSegments.length > tournamentIdx + 4) {
+    const slug = pathSegments[tournamentIdx + 1]; // j100-loughborough
+    const countryCode = pathSegments[tournamentIdx + 2]; // gbr
+    const key = pathSegments[pathSegments.length - 1];
     const tabSlugs = ['draws-and-results', 'fact-sheet', 'acceptance-list', 'champions'];
-    if (tabSlugs.includes(last.toLowerCase()) && pathSegments.length > 1) {
+    if (!tabSlugs.includes(key.toLowerCase())) {
+      data.tournamentKey = key; // j-j100-gbr-2026-004
+    } else if (pathSegments.length > tournamentIdx + 5) {
       data.tournamentKey = pathSegments[pathSegments.length - 2];
-    } else {
-      data.tournamentKey = last;
     }
+    if (slug && safeTest(/^[jw]\d+-/i, slug)) {
+      const catMatch = slug.match(/^([jw]\d+)-(.+)$/i);
+      if (catMatch) {
+        urlCategory = catMatch[1].toUpperCase();
+        urlCity = (catMatch[2] || '').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      }
+    }
+    if (countryCode && countryCode.length === 3) urlCountry = countryCode.toUpperCase();
   }
 
   // --- Normalizace data na YYYY-MM-DD ---
@@ -63,7 +81,7 @@
     if (!val || typeof val !== 'string') return null;
     const s = val.trim();
     if (!s) return null;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    if (safeTest(/^\d{4}-\d{2}-\d{2}$/, s)) return s;
     // US format M/D/YYYY nebo M/D/YYYY H:MM (např. schema.org "2/15/2026 12:00:00 AM")
     const usMatch = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})/);
     if (usMatch) {
@@ -142,11 +160,40 @@
     return null;
   }
 
+  function normalizeTournamentName(n) {
+    if (!n || typeof n !== 'string') return n || '';
+    return n.replace(/^([JW]\d+\s+[A-Za-z]+)\1/i, '$1').trim();
+  }
+
   // --- Název turnaje (z main) ---
   const nameEl = root.querySelector('.tournament-hero__name, h1.tournament-hero__name, h1');
   if (nameEl) {
     const t = (nameEl.textContent || '').trim();
-    if (t && t.length < 300) data.tournamentName = t;
+    if (t && t.length < 300) data.tournamentName = normalizeTournamentName(t);
+  }
+
+  // --- Parsování rozsahu datumů "02 Mar - 06 Mar 2026" ---
+  function parseDateRange(val) {
+    if (!val || typeof val !== 'string') return null;
+    const s = val.trim();
+    const shortMonths = 'jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec';
+    const rangeMatch = s.match(new RegExp('(\\d{1,2})\\s+(' + shortMonths + ')\\s*-\\s*(\\d{1,2})\\s+(' + shortMonths + ')\\s+(\\d{4})', 'i'));
+    if (rangeMatch) {
+      const [, d1, m1, d2, m2, year] = rangeMatch;
+      const monthNum = (m) => ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(m.toLowerCase()) + 1;
+      return {
+        startDate: year + '-' + String(monthNum(m1)).padStart(2, '0') + '-' + d1.padStart(2, '0'),
+        endDate: year + '-' + String(monthNum(m2)).padStart(2, '0') + '-' + d2.padStart(2, '0'),
+      };
+    }
+    const singleMatch = s.match(new RegExp('(\\d{1,2})\\s+(' + shortMonths + ')\\s+(\\d{4})', 'i'));
+    if (singleMatch) {
+      const [, d, m, year] = singleMatch;
+      const monthNum = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(m.toLowerCase()) + 1;
+      const date = year + '-' + String(monthNum).padStart(2, '0') + '-' + d.padStart(2, '0');
+      return { startDate: date, endDate: date };
+    }
+    return null;
   }
 
   // --- Hero: Dates, Host nation, Surface (jen v main) ---
@@ -155,22 +202,30 @@
     const label = (item.querySelector('.tournament-hero__label')?.textContent || '').trim().toLowerCase();
     const value = (item.querySelector('.tournament-hero__value')?.textContent || '').trim();
     if (!value) return;
-    if (label.includes('date')) data.startDate = normalizeDate(value) || value;
+    if (label.includes('date')) {
+      const range = parseDateRange(value);
+      if (range) {
+        data.startDate = range.startDate;
+        data.endDate = range.endDate;
+      } else {
+        data.startDate = normalizeDate(value) || value;
+      }
+    }
     if (label.includes('host nation')) data.country = value;
     if (label.includes('surface')) data.surface = value;
   });
 
-  // --- Tournament Information: všechny položky z .tournament-info__details ---
-  data.drawSize = findInRootByLabel(['draw size']);
-  data.singlesMainDrawFormat = findInRootByLabel(['singles main draw format']);
+  // --- Tournament Information: všechny položky z .tournament-info__details (více variant labelů) ---
+  data.drawSize = findInRootByLabel(['draw size', 'main draw size']);
+  data.singlesMainDrawFormat = findInRootByLabel(['singles main draw format', 'main draw format']);
   data.entryDeadline = findInRootByLabel(['entry deadline']);
   data.withdrawalDeadline = findInRootByLabel(['withdrawal deadline']);
-  data.mainDrawSignIn = findInRootByLabel(['single main draw sign-in', 'main draw sign-in']);
-  data.qualifyingSignIn = findInRootByLabel(['singles qualifying sign-in', 'qualifying sign-in']);
-  data.firstDayQualifying = findInRootByLabel(['first day of singles qualifying']);
-  data.firstDayMainDraw = findInRootByLabel(['first day of singles main draw']);
-  data.tournamentDirectorName = findInRootByLabel(['tournament director name']);
-  data.tournamentDirectorEmail = findInRootByLabel(['tournament director email']);
+  data.mainDrawSignIn = findInRootByLabel(['single main draw sign-in', 'main draw sign-in', 'main draw sign in']);
+  data.qualifyingSignIn = findInRootByLabel(['singles qualifying sign-in', 'qualifying sign-in', 'qualifying sign in']);
+  data.firstDayQualifying = findInRootByLabel(['first day of singles qualifying', 'first day qualifying']);
+  data.firstDayMainDraw = findInRootByLabel(['first day of singles main draw', 'first day main draw']);
+  data.tournamentDirectorName = findInRootByLabel(['tournament director name', 'tournament director']);
+  data.tournamentDirectorEmail = findInRootByLabel(['tournament director email', 'tournament director e-mail']);
   data.officialBall = findInRootByLabel(['official ball']);
   data.tournamentKeyFactsheet = findInRootByLabel(['tournament key']);
 
@@ -203,6 +258,10 @@
     const match = data.venueAddress.match(/, ([^,]+), [A-Za-z ]+$/);
     if (match) data.city = match[1].trim();
   }
+  // Fallback z URL (category, city, country)
+  if (!data.category && urlCategory) data.category = urlCategory;
+  if (!data.city && urlCity) data.city = urlCity;
+  if (!data.country && urlCountry) data.country = urlCountry;
   const schemaScript = root.querySelector('script[type="application/ld+json"]');
   if (schemaScript && !data.city) {
     try {
@@ -217,7 +276,7 @@
   // Použít oficiální klíč z factsheetu, když URL dá jen záložku (draws-and-results, fact-sheet…)
   if (data.tournamentKeyFactsheet) {
     data.tournamentKey = data.tournamentKeyFactsheet;
-  } else if (data.tournamentKey && /^(draws-and-results|fact-sheet|acceptance-list|champions)$/i.test(data.tournamentKey)) {
+  } else if (data.tournamentKey && safeTest(/^(draws-and-results|fact-sheet|acceptance-list|champions)$/i, data.tournamentKey)) {
     data.tournamentKey = null;
   }
 

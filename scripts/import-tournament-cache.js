@@ -92,10 +92,15 @@ function normalizeDate(val) {
   return null;
 }
 
+function normalizeTournamentName(n) {
+  if (!n || typeof n !== 'string') return n || '';
+  return String(n).replace(/^([JW]\d+\s+[A-Za-z]+)\1/i, '$1').trim();
+}
+
 /** Map row from extract or DB format to tournament_cache insert shape */
 function toCacheRow(item) {
   const tournament_key = item.tournament_key ?? item.tournamentKey ?? null;
-  const name = item.name ?? item.tournamentName ?? '';
+  const name = normalizeTournamentName(item.name ?? item.tournamentName ?? '');
   const city = (item.city || item.country || 'N/A').trim() || 'N/A';
   const startDateRaw = item.start_date ?? item.startDate ?? null;
   const start_date = normalizeDate(startDateRaw) || startDateRaw;

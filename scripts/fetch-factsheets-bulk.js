@@ -101,7 +101,8 @@ async function main() {
   const page = await browser.newPage();
   await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
-  const results = [];
+  // Map URL -> factsheet data (pro sloučení s kalendářem)
+  const factsheetByUrl = new Map();
   for (let i = 0; i < toFetch.length; i++) {
     const item = toFetch[i];
     const url = item.factSheetUrl;
@@ -111,7 +112,7 @@ async function main() {
       await new Promise((r) => setTimeout(r, 3000));
       const data = await page.evaluate((code) => eval(code), extractCode);
       if (data && (data.tournamentKey || data.tournamentName)) {
-        results.push(data);
+        factsheetByUrl.set(url, data);
         console.log('OK');
       } else {
         console.log('prázdný výstup');
@@ -123,12 +124,24 @@ async function main() {
 
   await browser.close();
 
+  // Sloučit: všechny položky z kalendáře, factsheet data přepíše kde je k dispozici
+  const merged = items.map((cal) => {
+    const url = cal.factSheetUrl;
+    const sheet = url ? factsheetByUrl.get(url) : null;
+    if (!sheet) return cal;
+    const out = { ...cal };
+    for (const [k, v] of Object.entries(sheet)) {
+      if (v != null && v !== '') out[k] = v;
+    }
+    return out;
+  });
+
   const outDir = path.dirname(outputPath);
   if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
-  fs.writeFileSync(outputPath, JSON.stringify(results, null, 2), 'utf8');
-  console.log('Uloženo', results.length, 'turnajů do', outputPath);
+  fs.writeFileSync(outputPath, JSON.stringify(merged, null, 2), 'utf8');
+  console.log('Uloženo', merged.length, 'turnajů do', outputPath, '(kalendář + factsheet merge)');
 
-  if (doImport && results.length > 0) {
+  if (doImport && merged.length > 0) {
     console.log('Spouštím import do Supabase...');
     try {
       execSync(`node "${path.join(__dirname, 'import-tournament-cache.js')}" "${outputPath}"`, {

@@ -45,6 +45,12 @@ export function getAgeFromBirthDate(
   return Math.max(0, refYear - birthYear);
 }
 
+/** Normalize tournament name – removes duplication e.g. "J100 LOUGHBOROUGHJ100 LOUGHBOROUGH (GBR)" → "J100 LOUGHBOROUGH (GBR)" */
+export function formatTournamentName(name: string | null | undefined): string {
+  if (!name || typeof name !== 'string') return name || '';
+  return name.replace(/^([JW]\d+\s+[A-Za-z]+)\1/i, '$1').trim();
+}
+
 /** Max. počet turnajů dle věku: 13→10, 14→14, 15→18, 16→25; <13→10, >16→25. */
 export function getMaxTournamentsForAge(age: number): number {
   if (age <= 13) return 10;

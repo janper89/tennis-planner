@@ -42,10 +42,16 @@ export interface ITFTournamentSearchResult {
   officialBall?: string | null;
 }
 
+/** Remove duplicated pattern e.g. "J100 LOUGHBOROUGHJ100 LOUGHBOROUGH (GBR)" → "J100 LOUGHBOROUGH (GBR)" */
+function normalizeTournamentName(name: string): string {
+  if (!name || typeof name !== 'string') return name || '';
+  return name.replace(/^([JW]\d+\s+[A-Za-z]+)\1/i, '$1').trim();
+}
+
 function mapCacheRowToSearchResult(row: TournamentCacheRow): ITFTournamentSearchResult {
   return {
     tournamentKey: row.tournament_key,
-    name: row.name,
+    name: normalizeTournamentName(row.name),
     city: row.city,
     startDate: row.start_date,
     category: row.category ?? undefined,
@@ -206,9 +212,9 @@ export async function createTournament(
   supabase: SupabaseClient<Database>
 ): Promise<Tournament> {
   try {
-    // Map ITF data to our database schema
+    // Map ITF data to our database schema (normalize name to fix duplicates like "J100 LOUGHBOROUGHJ100 LOUGHBOROUGH (GBR)")
     const tournamentInsert: TournamentInsertType = {
-      nazev: tournamentData.name,
+      nazev: normalizeTournamentName(tournamentData.name),
       kategorie: tournamentData.category || 'N/A',
       misto: tournamentData.city,
       datum: tournamentData.startDate,
@@ -218,6 +224,7 @@ export async function createTournament(
       withdrawal_deadline_text: tournamentData.withdrawalDeadline ?? null,
       tournament_director_name: tournamentData.tournamentDirectorName ?? null,
       official_ball: tournamentData.officialBall ?? null,
+      draw_size: tournamentData.drawSize ?? null,
       // entry_deadline and withdraw_deadline are calculated by trigger
     };
 
