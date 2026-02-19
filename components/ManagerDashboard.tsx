@@ -12,6 +12,8 @@ import {
 } from '@/lib/utils';
 import { ADMIN_EMAILS } from '@/lib/config';
 import RoleSwitcher from '@/components/RoleSwitcher';
+import TournamentNameInput from '@/components/TournamentNameInput';
+import { registerPlayerForTournament, type ITFTournamentSearchResult } from '@/lib/tournament-service';
 import type { Database } from '@/types/database';
 
 type Player = Database['public']['Tables']['player']['Row'];
@@ -53,6 +55,13 @@ export default function ManagerDashboard({
   const [showAddParentForm, setShowAddParentForm] = useState(false);
   const [newParentEmail, setNewParentEmail] = useState('');
   const [loadingParents, setLoadingParents] = useState(false);
+  const [showAddTournamentForm, setShowAddTournamentForm] = useState(false);
+  const [selectedPlayerForAdd, setSelectedPlayerForAdd] = useState<Player | null>(null);
+  const [tournamentNameValue, setTournamentNameValue] = useState('');
+  const [selectedTournament, setSelectedTournament] = useState<ITFTournamentSearchResult | null>(null);
+  const [addTournamentPriority, setAddTournamentPriority] = useState(1);
+  const [addTournamentPoznamka, setAddTournamentPoznamka] = useState('');
+  const [addTournamentLoading, setAddTournamentLoading] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -206,6 +215,61 @@ export default function ManagerDashboard({
     window.location.href = '/login';
   };
 
+  const handleAddTournamentForManager = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPlayerForAdd || !tournamentNameValue.trim()) {
+      alert('Vyber hráče a zadej název turnaje');
+      return;
+    }
+    setAddTournamentLoading(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        alert('Musíš být přihlášen');
+        setAddTournamentLoading(false);
+        return;
+      }
+      const { data: appUser } = await supabase
+        .from('app_user')
+        .select('id')
+        .eq('email', user.email!)
+        .single();
+      if (!appUser) {
+        alert('Uživatel nenalezen');
+        setAddTournamentLoading(false);
+        return;
+      }
+      const result = await registerPlayerForTournament(
+        {
+          tournamentName: tournamentNameValue.trim(),
+          playerId: selectedPlayerForAdd.id,
+          priority: addTournamentPriority,
+          poznamka: addTournamentPoznamka || undefined,
+          userId: appUser.id,
+          selectedTournament: selectedTournament ?? undefined,
+        },
+        supabase
+      );
+      if (result.success) {
+        alert(result.message);
+        setShowAddTournamentForm(false);
+        setTournamentNameValue('');
+        setSelectedTournament(null);
+        setSelectedPlayerForAdd(null);
+        window.location.reload();
+      } else {
+        alert(result.message);
+      }
+    } catch (err) {
+      console.error('Error adding tournament:', err);
+      alert('Došlo k chybě při přidávání turnaje');
+    } finally {
+      setAddTournamentLoading(false);
+    }
+  };
+
   // Get unique weeks from tournaments
   const weeks = [
     ...new Set(tournaments.map((t) => getWeekNumber(t.datum).toString())),
@@ -357,6 +421,102 @@ export default function ManagerDashboard({
               ))}
             </select>
           </div>
+        </div>
+
+        {/* Add Tournament */}
+        <div className="mb-6">
+          <button
+            onClick={() => {
+              setShowAddTournamentForm(!showAddTournamentForm);
+              if (!showAddTournamentForm) {
+                setSelectedPlayerForAdd(filteredPlayers[0] || null);
+                setTournamentNameValue('');
+                setSelectedTournament(null);
+              }
+            }}
+            className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+          >
+            {showAddTournamentForm ? 'Zrušit' : '+ Přidat turnaj'}
+          </button>
+
+          {showAddTournamentForm && (
+            <form
+              onSubmit={handleAddTournamentForManager}
+              className="mt-4 rounded-lg bg-white p-6 shadow"
+            >
+              <h3 className="mb-4 text-lg font-semibold">Přidat turnaj hráči</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Hráč *
+                  </label>
+                  <select
+                    value={selectedPlayerForAdd?.id || ''}
+                    onChange={(e) => {
+                      const p = filteredPlayers.find((x) => x.id === e.target.value);
+                      setSelectedPlayerForAdd(p || null);
+                    }}
+                    required
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                  >
+                    <option value="">Vyber hráče</option>
+                    {filteredPlayers.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.rocnik} • {getAgeFromBirthDate(p.birth_date)} let)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Název turnaje *
+                  </label>
+                  <TournamentNameInput
+                    value={tournamentNameValue}
+                    onChange={setTournamentNameValue}
+                    onSelect={setSelectedTournament}
+                    name="nazev"
+                    required
+                    placeholder="Zadej název turnaje pro vyhledání"
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Priorita (1–3)
+                  </label>
+                  <select
+                    value={addTournamentPriority}
+                    onChange={(e) => setAddTournamentPriority(parseInt(e.target.value, 10))}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                  >
+                    <option value={1}>1</option>
+                    <option value={2}>2</option>
+                    <option value={3}>3</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Poznámka (volitelné)
+                  </label>
+                  <input
+                    type="text"
+                    value={addTournamentPoznamka}
+                    onChange={(e) => setAddTournamentPoznamka(e.target.value)}
+                    placeholder="Poznámka"
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={addTournamentLoading || !tournamentNameValue.trim() || !selectedPlayerForAdd}
+                  className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                >
+                  {addTournamentLoading ? 'Přidávám...' : 'Přidat turnaj'}
+                </button>
+              </div>
+            </form>
+          )}
         </div>
 
         {/* Matrix View */}

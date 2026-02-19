@@ -19,6 +19,7 @@ import {
   type RegisterTournamentParams,
   type ITFTournamentSearchResult,
 } from '@/lib/tournament-service';
+import TournamentNameInput from '@/components/TournamentNameInput';
 
 type Player = Database['public']['Tables']['player']['Row'];
 type Tournament = Database['public']['Tables']['tournament']['Row'];
@@ -68,6 +69,8 @@ export default function ParentDashboard({
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [connectionSuccess, setConnectionSuccess] = useState<string | null>(null);
   const [connectionLoading, setConnectionLoading] = useState(false);
+  const [tournamentNameValue, setTournamentNameValue] = useState('');
+  const [selectedTournament, setSelectedTournament] = useState<ITFTournamentSearchResult | null>(null);
   const supabase = createClient();
   const router = useRouter();
 
@@ -84,6 +87,17 @@ export default function ParentDashboard({
   useEffect(() => {
     if (!showAddChildForm) setAddChildBirthDate('');
   }, [showAddChildForm]);
+
+  // Reset tournament input when form closes or editing changes
+  useEffect(() => {
+    if (!showForm) {
+      setTournamentNameValue('');
+      setSelectedTournament(null);
+    } else if (editingEntry) {
+      setTournamentNameValue(formatTournamentName(editingEntry.tournament.nazev));
+      setSelectedTournament(null);
+    }
+  }, [showForm, editingEntry]);
 
   // Group entries by week
   const entriesByWeek = entries.reduce((acc, entry) => {
@@ -136,6 +150,24 @@ export default function ParentDashboard({
           poznamka: poznamka || undefined,
           userId: appUser.id,
         };
+
+        // Uživatel vybral turnaj z autocomplete dropdownu
+        if (selectedTournament) {
+          const result = await registerPlayerForTournament(
+            { ...baseParams, selectedTournament },
+            supabase
+          );
+          setSelectedTournament(null);
+          setTournamentNameValue('');
+          if (result.success) {
+            alert(result.message);
+            window.location.reload();
+            return;
+          }
+          alert(result.message);
+          setLoading(false);
+          return;
+        }
 
         // Uživatel vybral jeden z více výsledků – přihlásit na vybraný turnaj
         if (searchResults && searchResults.length > 1) {
@@ -977,19 +1009,30 @@ export default function ParentDashboard({
                 <label className="block text-sm font-medium text-gray-700">
                   Název turnaje *
                 </label>
-                <input
-                  type="text"
-                  name="nazev"
-                  required
-                  defaultValue={editingEntry ? formatTournamentName(editingEntry.tournament.nazev) : ''}
-                  onChange={() => setSearchResults(null)}
-                  placeholder={
-                    useAutoSearch && !editingEntry
-                      ? 'Zadej název turnaje pro vyhledání v ITF'
-                      : 'Název turnaje'
-                  }
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                />
+                {useAutoSearch && !editingEntry ? (
+                  <TournamentNameInput
+                    value={tournamentNameValue}
+                    onChange={(v) => {
+                      setTournamentNameValue(v);
+                      setSearchResults(null);
+                    }}
+                    onSelect={(t) => setSelectedTournament(t)}
+                    name="nazev"
+                    required
+                    placeholder="Zadej název turnaje pro vyhledání v ITF"
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    name="nazev"
+                    required
+                    defaultValue={editingEntry ? formatTournamentName(editingEntry.tournament.nazev) : ''}
+                    onChange={() => setSearchResults(null)}
+                    placeholder="Název turnaje"
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                  />
+                )}
               </div>
               {/* Výběr turnaje, když vyhledávání vrátí více výsledků */}
               {searchResults && searchResults.length > 1 && (

@@ -18,6 +18,7 @@ import {
   type RegisterTournamentParams,
   type ITFTournamentSearchResult,
 } from '@/lib/tournament-service';
+import TournamentNameInput from '@/components/TournamentNameInput';
 
 type Player = Database['public']['Tables']['player']['Row'];
 type Tournament = Database['public']['Tables']['tournament']['Row'];
@@ -58,6 +59,8 @@ export default function CoachDashboard({
   const [editingEntryForTournament, setEditingEntryForTournament] = useState<Entry | null>(null);
   const [generatedCodeForPlayer, setGeneratedCodeForPlayer] = useState<{ playerId: string; code: string } | null>(null);
   const [generateCodeLoading, setGenerateCodeLoading] = useState(false);
+  const [tournamentNameValue, setTournamentNameValue] = useState('');
+  const [selectedTournament, setSelectedTournament] = useState<ITFTournamentSearchResult | null>(null);
   const supabase = createClient();
 
   // Update state when props change
@@ -72,6 +75,14 @@ export default function CoachDashboard({
   useEffect(() => {
     if (!showAddPlayerForm) setAddPlayerBirthDate('');
   }, [showAddPlayerForm]);
+
+  // Reset tournament input when add-tournament form closes
+  useEffect(() => {
+    if (!showAddTournamentForm) {
+      setTournamentNameValue('');
+      setSelectedTournament(null);
+    }
+  }, [showAddTournamentForm]);
 
   // Create a map of player_id -> entries
   const entriesByPlayer = entries.reduce((acc, entry) => {
@@ -227,6 +238,24 @@ export default function CoachDashboard({
           poznamka: poznamka || undefined,
           userId: appUser.id,
         };
+
+        // User selected from autocomplete dropdown
+        if (selectedTournament) {
+          const result = await registerPlayerForTournament(
+            { ...baseParams, selectedTournament },
+            supabase
+          );
+          setSelectedTournament(null);
+          setTournamentNameValue('');
+          if (result.success) {
+            alert(result.message);
+            window.location.reload();
+            return;
+          }
+          alert(result.message);
+          setLoading(false);
+          return;
+        }
 
         // User selected one of multiple results
         if (searchResults && searchResults.length > 1) {
@@ -739,17 +768,28 @@ export default function CoachDashboard({
                 <label className="block text-sm font-medium text-gray-700">
                   Název turnaje *
                 </label>
-                <input
-                  type="text"
-                  name="nazev"
-                  required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                  placeholder={
-                    useAutoSearch
-                      ? 'Zadejte část názvu turnaje...'
-                      : 'Název turnaje'
-                  }
-                />
+                {useAutoSearch ? (
+                  <TournamentNameInput
+                    value={tournamentNameValue}
+                    onChange={(v) => {
+                      setTournamentNameValue(v);
+                      setSearchResults(null);
+                    }}
+                    onSelect={(t) => setSelectedTournament(t)}
+                    name="nazev"
+                    required
+                    placeholder="Zadejte část názvu turnaje..."
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    name="nazev"
+                    required
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                    placeholder="Název turnaje"
+                  />
+                )}
               </div>
 
               {/* Multiple results selection */}
