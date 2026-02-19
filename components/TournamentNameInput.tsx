@@ -33,24 +33,34 @@ export default function TournamentNameInput({
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const supabase = createClient();
 
   const fetchSuggestions = useCallback(
     async (query: string) => {
-      if (!query.trim()) {
+      const trimmedQuery = query.trim();
+      if (!trimmedQuery || trimmedQuery.length < 2) {
         setSuggestions([]);
         setIsOpen(false);
         return;
       }
       setLoading(true);
+      setError(null);
       try {
-        const results = await searchTournamentsByName(supabase, query.trim(), 8);
+        const results = await searchTournamentsByName(supabase, trimmedQuery, 8);
+        console.log('Tournament search results:', { query: trimmedQuery, count: results.length, results });
         setSuggestions(results);
         setIsOpen(results.length > 0);
         setHighlightedIndex(-1);
-      } catch {
+        if (results.length === 0 && trimmedQuery.length >= 2) {
+          setError('Žádné turnaje nenalezeny');
+        }
+      } catch (error) {
+        console.error('Error fetching tournament suggestions:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Chyba při vyhledávání';
+        setError(`Chyba: ${errorMessage}`);
         setSuggestions([]);
         setIsOpen(false);
       } finally {
@@ -62,11 +72,13 @@ export default function TournamentNameInput({
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!value.trim()) {
-      setSuggestions([]);
-      setIsOpen(false);
-      return;
-    }
+    const trimmedValue = value.trim();
+      if (!trimmedValue || trimmedValue.length < 2) {
+        setSuggestions([]);
+        setIsOpen(false);
+        setError(null);
+        return;
+      }
     debounceRef.current = setTimeout(() => {
       fetchSuggestions(value);
     }, DEBOUNCE_MS);
@@ -77,12 +89,14 @@ export default function TournamentNameInput({
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
+      // Použij click místo mousedown, aby se dropdown nezavřel před výběrem itemu
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    // Použij click event s capture phase, aby se zachytil i když je dropdown otevřený
+    document.addEventListener('click', handleClickOutside, true);
+    return () => document.removeEventListener('click', handleClickOutside, true);
   }, []);
 
   const handleSelect = (tournament: ITFTournamentSearchResult) => {
@@ -131,7 +145,17 @@ export default function TournamentNameInput({
         name={name}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        onFocus={() => value.trim() && suggestions.length > 0 && setIsOpen(true)}
+        onFocus={() => {
+          // Když uživatel klikne zpět do inputu, zobraz dropdown pokud jsou suggestions nebo pokud se načítají
+          if (value.trim().length >= 2) {
+            if (suggestions.length > 0) {
+              setIsOpen(true);
+            } else if (!loading) {
+              // Pokud nejsou suggestions a není loading, zkus načíst znovu
+              fetchSuggestions(value);
+            }
+          }
+        }}
         onKeyDown={handleKeyDown}
         required={required}
         placeholder={placeholder}
@@ -142,6 +166,16 @@ export default function TournamentNameInput({
       {loading && (
         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
           Hledám...
+        </div>
+      )}
+      {error && !loading && value.trim().length >= 2 && (
+        <div className="absolute z-50 mt-1 w-full rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 shadow-lg">
+          {error}
+        </div>
+      )}
+      {!loading && !error && value.trim().length >= 2 && !isOpen && suggestions.length === 0 && value.trim() && (
+        <div className="absolute z-50 mt-1 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-500 shadow-lg">
+          Žádné turnaje nenalezeny
         </div>
       )}
       {isOpen && suggestions.length > 0 && (
@@ -158,8 +192,9 @@ export default function TournamentNameInput({
                 i === highlightedIndex ? 'bg-blue-50' : 'hover:bg-gray-50'
               }`}
               onMouseEnter={() => setHighlightedIndex(i)}
-              onMouseDown={(e) => {
+              onClick={(e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 handleSelect(t);
               }}
             >

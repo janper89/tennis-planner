@@ -62,6 +62,10 @@ export default function ManagerDashboard({
   const [addTournamentPriority, setAddTournamentPriority] = useState(1);
   const [addTournamentPoznamka, setAddTournamentPoznamka] = useState('');
   const [addTournamentLoading, setAddTournamentLoading] = useState(false);
+  const [showAddPlayerForm, setShowAddPlayerForm] = useState(false);
+  const [addPlayerBirthDate, setAddPlayerBirthDate] = useState('');
+  const [addPlayerCoachId, setAddPlayerCoachId] = useState<string>('');
+  const [addPlayerLoading, setAddPlayerLoading] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -213,6 +217,83 @@ export default function ManagerDashboard({
   const handleLogout = async () => {
     await supabase.auth.signOut();
     window.location.href = '/login';
+  };
+
+  const handleAddPlayer = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setAddPlayerLoading(true);
+    const form = e.currentTarget;
+    const name = (form.querySelector('[name="player_name"]') as HTMLInputElement)?.value?.trim();
+    const birthDate = (form.querySelector('[name="player_birth_date"]') as HTMLInputElement)?.value;
+    const rocnikStr = (form.querySelector('[name="player_rocnik"]') as HTMLInputElement)?.value;
+    const category = (form.querySelector('[name="player_category"]') as HTMLInputElement)?.value?.trim() || null;
+
+    if (!name || !birthDate || !rocnikStr) {
+      alert('Vyplň jméno, datum narození a ročník');
+      setAddPlayerLoading(false);
+      return;
+    }
+    const rocnik = parseInt(rocnikStr, 10);
+    if (Number.isNaN(rocnik) || rocnik < 1 || rocnik > 20) {
+      alert('Ročník musí být číslo 1–20');
+      setAddPlayerLoading(false);
+      return;
+    }
+    const birthDateObj = new Date(birthDate);
+    if (birthDateObj > new Date()) {
+      alert('Datum narození nemůže být v budoucnosti');
+      setAddPlayerLoading(false);
+      return;
+    }
+
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        alert('Musíš být přihlášen');
+        setAddPlayerLoading(false);
+        return;
+      }
+      const { data: appUser } = await supabase
+        .from('app_user')
+        .select('id')
+        .eq('email', user.email!)
+        .single();
+      if (!appUser) {
+        alert('Uživatel nenalezen');
+        setAddPlayerLoading(false);
+        return;
+      }
+
+      const limitTurnaju = getMaxTournamentsForAge(getAgeFromBirthDate(birthDate));
+      const coachId = addPlayerCoachId || appUser.id;
+
+      const { error: playerError } = await supabase.from('player').insert({
+        name,
+        birth_date: birthDate,
+        rocnik,
+        category: category || null,
+        coach_id: coachId,
+        parent_id: null,
+        limit_turnaju: limitTurnaju,
+      });
+
+      if (playerError) {
+        alert('Chyba při přidávání hráče: ' + playerError.message);
+        setAddPlayerLoading(false);
+        return;
+      }
+      setShowAddPlayerForm(false);
+      setAddPlayerBirthDate('');
+      setAddPlayerCoachId('');
+      window.location.reload();
+    } catch (err) {
+      console.error('Error adding player:', err);
+      alert('Došlo k chybě při přidávání hráče');
+    } finally {
+      setAddPlayerLoading(false);
+    }
   };
 
   const handleAddTournamentForManager = async (e: React.FormEvent) => {
@@ -383,6 +464,97 @@ export default function ManagerDashboard({
               </div>
             )}
           </div>
+        </div>
+
+        {/* Add Player */}
+        <div className="mb-6 rounded-lg bg-white p-6 shadow">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-900">Přidat hráče</h2>
+            <button
+              onClick={() => {
+                setShowAddPlayerForm(!showAddPlayerForm);
+                if (!showAddPlayerForm) setAddPlayerBirthDate('');
+              }}
+              className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+            >
+              {showAddPlayerForm ? 'Zrušit' : '+ Přidat hráče'}
+            </button>
+          </div>
+          {showAddPlayerForm && (
+            <form onSubmit={handleAddPlayer} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Jméno *</label>
+                <input
+                  type="text"
+                  name="player_name"
+                  required
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                  placeholder="Jméno hráče"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Datum narození *</label>
+                <input
+                  type="date"
+                  name="player_birth_date"
+                  required
+                  value={addPlayerBirthDate}
+                  onChange={(e) => setAddPlayerBirthDate(e.target.value)}
+                  max={new Date().toISOString().split('T')[0]}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                />
+                {addPlayerBirthDate && (
+                  <p className="mt-1 text-sm text-gray-600">
+                    Max. turnajů v sezóně:{' '}
+                    {getMaxTournamentsForAge(getAgeFromBirthDate(addPlayerBirthDate))}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Ročník *</label>
+                <input
+                  type="number"
+                  name="player_rocnik"
+                  required
+                  min={1}
+                  max={20}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                  placeholder="Např. 2010"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Kategorie</label>
+                <input
+                  type="text"
+                  name="player_category"
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                  placeholder="Např. U12"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Trenér (volitelné)</label>
+                <select
+                  value={addPlayerCoachId}
+                  onChange={(e) => setAddPlayerCoachId(e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                >
+                  <option value="">— Přiřadit později / já (manažer)</option>
+                  {coaches.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="submit"
+                disabled={addPlayerLoading}
+                className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+              >
+                {addPlayerLoading ? 'Přidávám...' : 'Přidat hráče'}
+              </button>
+            </form>
+          )}
         </div>
 
         {/* Filters */}

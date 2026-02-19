@@ -145,15 +145,21 @@ export async function searchTournamentsByName(
     const query = name.trim();
     if (!query) return [];
 
+    // Použij základní sloupce, které určitě existují v tournament_cache
+    // Rozšířené sloupce (country, venue, draw_size, atd.) jsou volitelné a přidávají se až v factsheet migraci
     const { data, error } = await supabase
       .from('tournament_cache')
-      .select('tournament_key, name, city, start_date, category, country, venue, end_date, draw_size, entry_deadline, withdrawal_deadline, tournament_director_name, official_ball')
+      .select('tournament_key, name, city, start_date, category')
       .ilike('name', `%${query}%`)
       .order('start_date', { ascending: true })
       .limit(limit);
 
     if (error) {
       console.error('Error searching tournament cache:', error);
+      // Pokud je chyba kvůli RLS nebo autentizaci, zkus to ještě jednou s lepším error handlingem
+      if (error.code === 'PGRST301' || error.message?.includes('permission') || error.message?.includes('RLS')) {
+        console.error('RLS or permission error - check if tournament_cache policies are set correctly');
+      }
       return [];
     }
 
