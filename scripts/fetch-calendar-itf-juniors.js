@@ -52,6 +52,10 @@ async function fetchMonth(page, startMonth) {
   return page.evaluate((startMonth) => {
     const out = [];
     const slug = (s) => (s || '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
+    const isTournamentHref = (href) => {
+      if (!href || typeof href !== 'string') return false;
+      return href.includes('itftennis.com') && (href.includes('/en/tournament/') || href.includes('factsheet'));
+    };
 
     function normalizeTournamentName(n) {
       if (!n || typeof n !== 'string') return n || '';
@@ -79,16 +83,17 @@ async function fetchMonth(page, startMonth) {
         const cells = row.querySelectorAll('td');
         if (cells.length < 2) continue;
 
-        const links = row.querySelectorAll('a[href*="tournament"], a[href*="factsheet"]');
+        const links = row.querySelectorAll('a[href]');
         let name = '';
         let tournamentId = null;
         let factSheetUrl = null;
         for (const a of links) {
+          if (!isTournamentHref(a.href)) continue;
           const text = (a.textContent || '').trim();
           if (text.length > 2 && text.length < 200) {
             name = text;
             tournamentId = getTournamentIdFromLink(a);
-            if (a.href && a.href.includes('itftennis') && (a.href.includes('/tournament/') || a.href.includes('factsheet'))) factSheetUrl = a.href;
+            if (a.href) factSheetUrl = a.href;
             break;
           }
         }
@@ -142,6 +147,10 @@ async function fetchMonth(page, startMonth) {
         }
 
         if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) continue;
+
+        // Odfiltrovat navigační/sekční řádky, které nejsou turnaje.
+        if (!factSheetUrl && !tournamentId && !category) continue;
+
         const tournamentKey = tournamentId || `itf-juniors-${slug(name)}-${startDate}`;
         out.push({
           tournamentKey,
@@ -167,7 +176,7 @@ async function fetchMonth(page, startMonth) {
         if (nameLower.includes('junior finals') || nameLower.includes('world tennis tour junior finals')) continue;
         const link = el.querySelector('a[href*="tournament"], a[href*="factsheet"]');
         const tournamentId = link ? getTournamentIdFromLink(link) : null;
-        const factSheetUrl = (link && link.href && link.href.includes('itftennis') && (link.href.includes('/tournament/') || link.href.includes('factsheet'))) ? link.href : null;
+        const factSheetUrl = (link && isTournamentHref(link.href)) ? link.href : null;
         if (factSheetUrl && factSheetUrl.toLowerCase().includes('wheelchair')) continue;
         const text = el.innerText || '';
         const allDates = text.match(/(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})|(\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2})/g);
@@ -231,7 +240,7 @@ async function fetchMonth(page, startMonth) {
         }
         if (!startDate) continue;
         const category = (row && (row.innerText || '').match(/\b(J\d+)\b/i)) ? row.innerText.match(/\b(J\d+)\b/i)[1] : null;
-        const factSheetUrl = (a.href && a.href.includes('itftennis') && (a.href.includes('/tournament/') || a.href.includes('factsheet'))) ? a.href : null;
+        const factSheetUrl = isTournamentHref(a.href) ? a.href : null;
         if (factSheetUrl && (factSheetUrl.toLowerCase().includes('wheelchair') || factSheetUrl.toLowerCase().includes('junior-finals') || factSheetUrl.toLowerCase().includes('jm-chn'))) continue;
         out.push({
           tournamentKey: tournamentId || `itf-juniors-${key}-${startDate}`,
@@ -244,7 +253,15 @@ async function fetchMonth(page, startMonth) {
       }
     }
 
-    return out;
+    // Finální filtr: odstranit zjevné neturnajové položky z navigace.
+    const denyName = /^(women'?s calendar|men'?s calendar|juniors calendar|masters tour calendar|beach tennis calendar|grand slam tournaments|results)$/i;
+    return out.filter((t) => {
+      const name = (t.tournamentName || '').trim();
+      if (!name || denyName.test(name)) return false;
+      if (!t.startDate || !/^\d{4}-\d{2}-\d{2}$/.test(t.startDate)) return false;
+      if (!t.factSheetUrl && !/^j[-_]/i.test(t.tournamentKey || '') && !/^J\d+$/i.test(t.category || '')) return false;
+      return true;
+    });
   }, startMonth);
 }
 

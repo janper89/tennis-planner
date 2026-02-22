@@ -144,10 +144,13 @@ async function main() {
   if (doImport && merged.length > 0) {
     console.log('Spouštím import do Supabase...');
     try {
-      execSync(`node "${path.join(__dirname, 'import-tournament-cache.js')}" "${outputPath}"`, {
+      execSync(
+        `node "${path.join(__dirname, 'import-tournament-cache.js')}" "${outputPath}" --from-today --window-months=3 --replace-all`,
+        {
         stdio: 'inherit',
         cwd: path.resolve(__dirname, '..'),
-      });
+        }
+      );
     } catch (e) {
       console.error('Import selhal (zkontroluj .env.local a SUPABASE_SERVICE_ROLE_KEY)');
     }

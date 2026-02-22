@@ -71,6 +71,7 @@ export default function ParentDashboard({
   const [connectionLoading, setConnectionLoading] = useState(false);
   const [tournamentNameValue, setTournamentNameValue] = useState('');
   const [selectedTournament, setSelectedTournament] = useState<ITFTournamentSearchResult | null>(null);
+  const [showOnlyPendingConfirmation, setShowOnlyPendingConfirmation] = useState(false);
   const supabase = createClient();
   const router = useRouter();
 
@@ -539,6 +540,19 @@ export default function ParentDashboard({
     window.location.href = '/login';
   };
 
+  // Hybrid režim: po datu turnaje nabídnout potvrzení odehrání, ale status neměnit automaticky.
+  const isPastTournament = (datum: string) => {
+    const tournamentDate = new Date(`${datum}T00:00:00`);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return tournamentDate < today;
+  };
+
+  const needsPlayedConfirmation = (entry: Entry) =>
+    entry.status !== 'odehrano' &&
+    entry.status !== 'odhlasen' &&
+    isPastTournament(entry.tournament.datum);
+
   const handleUpdateName = async () => {
     if (!newName.trim()) {
       alert('Jméno nemůže být prázdné');
@@ -580,6 +594,7 @@ export default function ParentDashboard({
   const playedCount = playerEntries.filter(
     (e) => e.status === 'odehrano'
   ).length;
+  const pendingCount = playerEntries.filter((e) => needsPlayedConfirmation(e)).length;
   const limit = selectedPlayer
     ? getMaxTournamentsForAge(getAgeFromBirthDate(selectedPlayer.birth_date))
     : 0;
@@ -853,6 +868,11 @@ export default function ParentDashboard({
                 <p className="font-medium">
                   {playedCount} / {limit}
                 </p>
+                {pendingCount > 0 && (
+                  <p className="text-xs text-amber-700">
+                    Čeká na potvrzení: {pendingCount}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -1174,14 +1194,30 @@ export default function ParentDashboard({
         {/* Tournaments by Week */}
         {selectedPlayer && (
           <div className="space-y-6">
+            <div className="flex justify-end">
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={showOnlyPendingConfirmation}
+                  onChange={(e) => setShowOnlyPendingConfirmation(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                Jen čekající na potvrzení
+                <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                  {pendingCount}
+                </span>
+              </label>
+            </div>
             {Object.entries(entriesByWeek)
               .sort(([a], [b]) => parseInt(a) - parseInt(b))
               .map(([weekNum, weekEntries]) => {
                 const firstEntry = weekEntries[0];
                 const weekRange = getWeekRange(firstEntry.tournament.datum);
-                const filteredEntries = weekEntries.filter(
-                  (e) => e.player_id === selectedPlayer.id
-                );
+                const filteredEntries = weekEntries
+                  .filter((e) => e.player_id === selectedPlayer.id)
+                  .filter((e) =>
+                    showOnlyPendingConfirmation ? needsPlayedConfirmation(e) : true
+                  );
 
                 if (filteredEntries.length === 0) return null;
 
@@ -1210,6 +1246,11 @@ export default function ParentDashboard({
                                 {entry.status === 'odehrano' && (
                                   <span className="rounded bg-green-600 px-2 py-0.5 text-xs font-medium text-white">
                                     Odehráno
+                                  </span>
+                                )}
+                                {needsPlayedConfirmation(entry) && (
+                                  <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                                    Čeká na potvrzení
                                   </span>
                                 )}
                               </div>
@@ -1289,16 +1330,17 @@ export default function ParentDashboard({
                               )}
                             </div>
                             <div className="ml-4 flex flex-wrap gap-2">
-                              {entry.status !== 'odehrano' ? (
+                              {entry.status !== 'odehrano' && entry.status !== 'odhlasen' && (
                                 <button
                                   type="button"
                                   onClick={() => handleMarkAsPlayed(entry.id)}
                                   disabled={loading}
                                   className="rounded-md bg-green-100 px-3 py-1 text-sm text-green-700 hover:bg-green-200 disabled:opacity-50"
                                 >
-                                  Odehráno
+                                  {needsPlayedConfirmation(entry) ? 'Potvrdit odehráno' : 'Odehráno'}
                                 </button>
-                              ) : (
+                              )}
+                              {entry.status === 'odehrano' && (
                                 <button
                                   type="button"
                                   onClick={() => handleUnmarkAsPlayed(entry.id)}

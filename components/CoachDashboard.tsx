@@ -61,6 +61,7 @@ export default function CoachDashboard({
   const [generateCodeLoading, setGenerateCodeLoading] = useState(false);
   const [tournamentNameValue, setTournamentNameValue] = useState('');
   const [selectedTournament, setSelectedTournament] = useState<ITFTournamentSearchResult | null>(null);
+  const [showOnlyPendingConfirmation, setShowOnlyPendingConfirmation] = useState(false);
   const supabase = createClient();
 
   // Update state when props change
@@ -121,6 +122,22 @@ export default function CoachDashboard({
       (e) => e.status === 'odehrano'
     ).length || 0;
   };
+
+  // Hybrid režim: po datu turnaje zobrazit "čeká na potvrzení", ale status neměnit automaticky.
+  const isPastTournament = (datum: string) => {
+    const tournamentDate = new Date(`${datum}T00:00:00`);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return tournamentDate < today;
+  };
+
+  const needsPlayedConfirmation = (entry: Entry) =>
+    entry.status !== 'odehrano' &&
+    entry.status !== 'odhlasen' &&
+    isPastTournament(entry.tournament.datum);
+
+  const getPendingConfirmationCount = (playerId: string) =>
+    entriesByPlayer[playerId]?.filter((e) => needsPlayedConfirmation(e)).length || 0;
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -515,6 +532,9 @@ export default function CoachDashboard({
   const playedCount = selectedPlayer
     ? getPlayedCount(selectedPlayer.id)
     : 0;
+  const pendingCount = selectedPlayer
+    ? getPendingConfirmationCount(selectedPlayer.id)
+    : 0;
   const limit = selectedPlayer
     ? getMaxTournamentsForAge(getAgeFromBirthDate(selectedPlayer.birth_date))
     : 0;
@@ -682,6 +702,11 @@ export default function CoachDashboard({
                 <p className="font-medium">
                   {playedCount} / {limit}
                 </p>
+                {pendingCount > 0 && (
+                  <p className="text-xs text-amber-700">
+                    Čeká na potvrzení: {pendingCount}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -1032,13 +1057,32 @@ export default function CoachDashboard({
         {/* Player Tournaments List (by week) */}
         {selectedPlayer && Object.keys(entriesByWeek).length > 0 && (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">
-              Turnaje - {selectedPlayer.name}
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">
+                Turnaje - {selectedPlayer.name}
+              </h3>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={showOnlyPendingConfirmation}
+                  onChange={(e) => setShowOnlyPendingConfirmation(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                Jen čekající na potvrzení
+                <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                  {pendingCount}
+                </span>
+              </label>
+            </div>
             {Object.entries(entriesByWeek)
               .sort(([a], [b]) => Number(a) - Number(b))
               .map(([weekNum, weekEntries]) => {
-                const firstEntry = weekEntries[0];
+                const visibleEntries = showOnlyPendingConfirmation
+                  ? weekEntries.filter((entry) => needsPlayedConfirmation(entry))
+                  : weekEntries;
+                if (visibleEntries.length === 0) return null;
+
+                const firstEntry = visibleEntries[0];
                 const weekRange = getWeekRange(firstEntry.tournament.datum);
                 return (
                   <div
@@ -1050,7 +1094,7 @@ export default function CoachDashboard({
                       {formatDate(weekRange.end)})
                     </h4>
                     <div className="space-y-2">
-                      {weekEntries.map((entry) => (
+                      {visibleEntries.map((entry) => (
                         <div key={entry.id}>
                           {editingEntryForTournament?.id === entry.id ? (
                             <form
@@ -1145,6 +1189,11 @@ export default function CoachDashboard({
                                       Odhlášeno
                                     </span>
                                   )}
+                                  {needsPlayedConfirmation(entry) && (
+                                    <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700">
+                                      Čeká na potvrzení
+                                    </span>
+                                  )}
                                 </p>
                                 {(entry.tournament.sign_in_deadline_text ||
                                   entry.tournament.tournament_director_name ||
@@ -1186,13 +1235,13 @@ export default function CoachDashboard({
                                 >
                                   Upravit
                                 </button>
-                                {entry.status !== 'odehrano' && (
+                                {entry.status !== 'odehrano' && entry.status !== 'odhlasen' && (
                                   <button
                                     onClick={() => handleMarkAsPlayed(entry.id)}
                                     disabled={loading}
                                     className="rounded-md bg-green-100 px-3 py-1 text-sm text-green-700 hover:bg-green-200 disabled:opacity-50"
                                   >
-                                    Odehráno
+                                    {needsPlayedConfirmation(entry) ? 'Potvrdit odehráno' : 'Odehráno'}
                                   </button>
                                 )}
                                 {entry.status === 'odhlasen' ? (

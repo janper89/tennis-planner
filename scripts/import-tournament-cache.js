@@ -3,8 +3,14 @@
  *
  * Usage:
  *   node scripts/import-tournament-cache.js [path/to/file.json]
+ *   node scripts/import-tournament-cache.js [path/to/file.json] --from-today --window-months=3 --replace-all
  *
  * Default file: data/tournament-cache.json
+ *
+ * Flags:
+ *   --from-today       keep only rows with start_date >= today
+ *   --window-months=N  keep only rows in [today, today+N months), default 3 when used with --from-today
+ *   --replace-all      delete existing tournament_cache rows before upsert
  *
  * Env (in .env.local or shell):
  *   NEXT_PUBLIC_SUPABASE_URL=...
@@ -23,6 +29,13 @@
 
 const fs = require('fs');
 const path = require('path');
+const args = process.argv.slice(2);
+
+const replaceAll = args.includes('--replace-all');
+const fromToday = args.includes('--from-today');
+const windowMonthsArg = args.find((a) => a.startsWith('--window-months='));
+const windowMonths = windowMonthsArg ? parseInt(windowMonthsArg.split('=')[1], 10) : null;
+const fileArg = args.find((a) => !a.startsWith('--'));
 
 // Načtení .env.local z kořene projektu (cesta vůči umístění skriptu)
 const envPath = path.resolve(__dirname, '..', '.env.local');
@@ -145,7 +158,7 @@ function toCacheRow(item) {
 }
 
 async function main() {
-  const filePath = process.argv[2] || path.join(process.cwd(), 'data', 'tournament-cache.json');
+  const filePath = fileArg || path.join(process.cwd(), 'data', 'tournament-cache.json');
 
   console.log('Importuji z:', filePath);
 
@@ -217,10 +230,48 @@ async function main() {
   for (const row of rows) byKey.set(row.tournament_key, row);
   rows = Array.from(byKey.values());
 
+  // Volitelný filtr: jen okno od dneška (+ N měsíců)
+  if (fromToday || (windowMonths != null && Number.isFinite(windowMonths) && windowMonths > 0)) {
+    const today = new Date();
+    const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    const monthsAhead = windowMonths != null && Number.isFinite(windowMonths) && windowMonths > 0 ? windowMonths : 3;
+    const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + monthsAhead, start.getUTCDate()));
+
+    const inRange = (s) => {
+      if (!s || typeof s !== 'string') return false;
+      const d = new Date(s + 'T00:00:00Z');
+      if (Number.isNaN(d.getTime())) return false;
+      return d >= start && d < end;
+    };
+
+    const before = rows.length;
+    rows = rows.filter((r) => inRange(r.start_date));
+    console.log(
+      `Filtrované okno: ${start.toISOString().slice(0, 10)} .. ${end.toISOString().slice(0, 10)} (bez konce), ${before} -> ${rows.length} řádků`
+    );
+  }
+
+  if (rows.length === 0) {
+    console.error('Po aplikaci filtrů nezbyly žádné řádky k importu.');
+    process.exit(1);
+  }
+
   const supabase = createClient(url, serviceKey);
   const BATCH = 100;
   let ok = 0;
   let err = 0;
+
+  if (replaceAll) {
+    console.log('Mažu existující data v tournament_cache (--replace-all)...');
+    const { error: deleteError } = await supabase
+      .from('tournament_cache')
+      .delete()
+      .not('tournament_key', 'is', null);
+    if (deleteError) {
+      console.error('Delete error:', deleteError.message);
+      process.exit(1);
+    }
+  }
 
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH);
