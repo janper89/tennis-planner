@@ -199,7 +199,7 @@ export default function ParentDashboard({
         }
 
         // Vyhledat turnaje (až 10 výsledků)
-        const results = await searchTournamentsByName(supabase, nazev.trim(), 10);
+        const results = await searchTournamentsByName(supabase, nazev.trim(), 20);
 
         if (results.length === 0) {
           setSearchError('Turnaj nebyl nalezen v seznamu turnajů. Použijte prosím ruční zadání.');

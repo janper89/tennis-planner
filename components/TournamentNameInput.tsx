@@ -49,7 +49,7 @@ export default function TournamentNameInput({
       setLoading(true);
       setError(null);
       try {
-        const results = await searchTournamentsByName(supabase, trimmedQuery, 8);
+        const results = await searchTournamentsByName(supabase, trimmedQuery, 20);
         console.log('Tournament search results:', { query: trimmedQuery, count: results.length, results });
         setSuggestions(results);
         setIsOpen(results.length > 0);

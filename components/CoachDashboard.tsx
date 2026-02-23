@@ -303,7 +303,7 @@ export default function CoachDashboard({
         }
 
         // Search for tournaments (up to 10 results)
-        const results = await searchTournamentsByName(supabase, nazev.trim(), 10);
+        const results = await searchTournamentsByName(supabase, nazev.trim(), 20);
 
         if (results.length === 0) {
           setSearchError('Turnaj nebyl nalezen v seznamu turnajů. Použijte prosím ruční zadání.');

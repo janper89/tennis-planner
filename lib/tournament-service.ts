@@ -139,7 +139,7 @@ export async function searchTournamentByName(
 export async function searchTournamentsByName(
   supabase: SupabaseClient<Database>,
   name: string,
-  limit = 10
+  limit = 20
 ): Promise<ITFTournamentSearchResult[]> {
   try {
     const query = name.trim();
@@ -150,7 +150,7 @@ export async function searchTournamentsByName(
     const { data, error } = await supabase
       .from('tournament_cache')
       .select('tournament_key, name, city, start_date, category')
-      .ilike('name', `%${query}%`)
+      .or(`name.ilike.%${query}%,city.ilike.%${query}%`)
       .order('start_date', { ascending: true })
       .limit(limit);
 
