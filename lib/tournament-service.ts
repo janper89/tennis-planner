@@ -165,9 +165,11 @@ async function findTournamentBySemanticMatch(
     .lte('datum', to.toISOString().slice(0, 10))
     .limit(10);
 
-  if (error || !data || data.length === 0) return null;
+  if (error) return null;
+  const rows = (data ?? []) as Tournament[];
+  if (rows.length === 0) return null;
 
-  const scored = [...data].sort((a, b) => {
+  const scored = [...rows].sort((a, b) => {
     const dateA = new Date(`${a.datum}T00:00:00Z`).getTime();
     const dateB = new Date(`${b.datum}T00:00:00Z`).getTime();
     const distanceA = Math.abs(dateA - baseDate.getTime());
