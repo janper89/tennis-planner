@@ -14,6 +14,8 @@
  * Volby:
  *   --import    po stažení spustit import do Supabase (import-tournament-cache.js)
  *   --limit=N   zpracovat max N turnajů (pro test)
+ *   --planning-window-months=N  stahovat factsheety jen pro planning horizont (default CACHE_WINDOW_MONTHS_PLANNING nebo 6)
+ *   --search-window-months=N    importovat cache pro autocomplete horizont (default CACHE_WINDOW_MONTHS_SEARCH nebo 18)
  */
 
 const fs = require('fs');
@@ -38,9 +40,50 @@ const args = process.argv.slice(2);
 const doImport = args.includes('--import');
 const limitArg = args.find((a) => a.startsWith('--limit='));
 const limit = limitArg ? parseInt(limitArg.split('=')[1], 10) : null;
+const planningWindowArg = args.find((a) => a.startsWith('--planning-window-months='));
+const searchWindowArg = args.find((a) => a.startsWith('--search-window-months='));
+const planningWindowMonths = planningWindowArg
+  ? parseInt(planningWindowArg.split('=')[1], 10)
+  : parseInt(process.env.CACHE_WINDOW_MONTHS_PLANNING || '6', 10);
+const searchWindowMonths = searchWindowArg
+  ? parseInt(searchWindowArg.split('=')[1], 10)
+  : parseInt(process.env.CACHE_WINDOW_MONTHS_SEARCH || '18', 10);
 const fileArg = args.filter((a) => !a.startsWith('--'))[0];
 const inputPath = fileArg || path.join(process.cwd(), 'data', 'tournament-cache.json');
 const outputPath = path.join(process.cwd(), 'data', 'tournament-cache-full.json');
+
+function normalizeDate(val) {
+  if (!val || typeof val !== 'string') return null;
+  const s = val.trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const usMatch = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})/);
+  if (usMatch) {
+    const [, a, b, y] = usMatch;
+    const n1 = parseInt(a, 10);
+    const n2 = parseInt(b, 10);
+    if (n1 >= 1 && n1 <= 12 && n2 >= 1 && n2 <= 31) return `${y}-${a.padStart(2, '0')}-${b.padStart(2, '0')}`;
+    if (n1 > 12) return `${y}-${b.padStart(2, '0')}-${a.padStart(2, '0')}`;
+  }
+  const dmyMatch = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{2,4})$/);
+  if (dmyMatch) {
+    const [, d, m, y] = dmyMatch;
+    const year = y.length === 2 ? `20${y}` : y;
+    return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  return null;
+}
+
+function isWithinMonthsFromToday(dateString, monthsAhead) {
+  const normalized = normalizeDate(dateString);
+  if (!normalized) return true;
+  const d = new Date(`${normalized}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return true;
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + monthsAhead, start.getUTCDate()));
+  return d >= start && d < end;
+}
 
 // Načíst extrakční kód z browser skriptu (řádky 15–215 + return out; })();)
 const extractScriptPath = path.join(__dirname, 'extract-itf-factsheet-browser.js');
@@ -80,14 +123,21 @@ async function main() {
     if (url.includes('junior-finals') || url.includes('jm-chn')) return false;
     return true;
   });
-  const toFetch = limit ? withUrl.slice(0, limit) : withUrl;
+  const withinPlanningWindow = withUrl.filter((i) =>
+    isWithinMonthsFromToday(i.startDate || i.start_date, planningWindowMonths)
+  );
+  const toFetch = limit ? withinPlanningWindow.slice(0, limit) : withinPlanningWindow;
 
   if (toFetch.length === 0) {
     console.log('Žádné záznamy s factSheetUrl. Spusť nejdřív kalendář (fetch-calendar-itf-juniors.js).');
     process.exit(0);
   }
 
-  console.log('Načítám', toFetch.length, 'factsheetů (Puppeteer)...');
+  console.log(
+    'Načítám',
+    toFetch.length,
+    `factsheetů (Puppeteer) v planning okně ${planningWindowMonths} měsíců, search okno pro import ${searchWindowMonths} měsíců...`
+  );
 
   let puppeteer;
   try {
@@ -145,7 +195,7 @@ async function main() {
     console.log('Spouštím import do Supabase...');
     try {
       execSync(
-        `node "${path.join(__dirname, 'import-tournament-cache.js')}" "${outputPath}" --from-today --window-months=3 --replace-all`,
+        `node "${path.join(__dirname, 'import-tournament-cache.js')}" "${outputPath}" --from-today --window-months=${searchWindowMonths} --replace-all`,
         {
         stdio: 'inherit',
         cwd: path.resolve(__dirname, '..'),

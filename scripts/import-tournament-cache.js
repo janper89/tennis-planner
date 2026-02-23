@@ -3,13 +3,13 @@
  *
  * Usage:
  *   node scripts/import-tournament-cache.js [path/to/file.json]
- *   node scripts/import-tournament-cache.js [path/to/file.json] --from-today --window-months=3 --replace-all
+ *   node scripts/import-tournament-cache.js [path/to/file.json] --from-today --window-months=18 --replace-all
  *
  * Default file: data/tournament-cache.json
  *
  * Flags:
  *   --from-today       keep only rows with start_date >= today
- *   --window-months=N  keep only rows in [today, today+N months), default 3 when used with --from-today
+ *   --window-months=N  keep only rows in [today, today+N months), default CACHE_WINDOW_MONTHS_SEARCH or 18
  *   --replace-all      delete existing tournament_cache rows before upsert
  *
  * Env (in .env.local or shell):
@@ -36,6 +36,8 @@ const fromToday = args.includes('--from-today');
 const windowMonthsArg = args.find((a) => a.startsWith('--window-months='));
 const windowMonths = windowMonthsArg ? parseInt(windowMonthsArg.split('=')[1], 10) : null;
 const fileArg = args.find((a) => !a.startsWith('--'));
+const overridesPath = path.join(process.cwd(), 'data', 'tournament-cache-overrides.json');
+const defaultSearchWindowMonths = parseInt(process.env.CACHE_WINDOW_MONTHS_SEARCH || '18', 10);
 
 // Načtení .env.local z kořene projektu (cesta vůči umístění skriptu)
 const envPath = path.resolve(__dirname, '..', '.env.local');
@@ -110,11 +112,31 @@ function normalizeTournamentName(n) {
   return String(n).replace(/^([JW]\d+\s+[A-Za-z]+)\1/i, '$1').trim();
 }
 
+function titleCaseWords(text) {
+  return text
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function inferCityFromTournamentName(name) {
+  const normalized = normalizeTournamentName(name || '');
+  const m = normalized.match(/^[JW]\d+\s+(.+?)(?:\s+\([A-Z]{3}\))?$/i);
+  if (!m) return null;
+  const raw = (m[1] || '').trim();
+  if (!raw || raw.length > 80) return null;
+  return titleCaseWords(raw);
+}
+
 /** Map row from extract or DB format to tournament_cache insert shape */
 function toCacheRow(item) {
   const tournament_key = item.tournament_key ?? item.tournamentKey ?? null;
   const name = normalizeTournamentName(item.name ?? item.tournamentName ?? '');
-  const city = (item.city || item.country || 'N/A').trim() || 'N/A';
+  const rawCity = (item.city || '').trim();
+  const inferredCity =
+    rawCity && rawCity.toLowerCase() !== 'n/a' ? rawCity : inferCityFromTournamentName(name);
+  const city = (inferredCity || item.country || 'N/A').trim() || 'N/A';
   const startDateRaw = item.start_date ?? item.startDate ?? null;
   const start_date = normalizeDate(startDateRaw) || startDateRaw;
   const category = item.category ?? null;
@@ -230,11 +252,29 @@ async function main() {
   for (const row of rows) byKey.set(row.tournament_key, row);
   rows = Array.from(byKey.values());
 
+  // Volitelné ruční overrides (pro případy, kdy ITF feed vrací neúplná data)
+  if (fs.existsSync(overridesPath)) {
+    try {
+      const rawOverrides = JSON.parse(fs.readFileSync(overridesPath, 'utf8'));
+      const overrideItems = Array.isArray(rawOverrides) ? rawOverrides : [rawOverrides];
+      const overrideRows = overrideItems.map(toCacheRow).filter(Boolean);
+      for (const row of overrideRows) byKey.set(row.tournament_key, row);
+      rows = Array.from(byKey.values());
+      console.log(`Načteno overrides: ${overrideRows.length} z ${overridesPath}`);
+    } catch (e) {
+      console.error(`Nepodařilo se načíst overrides (${overridesPath}):`, e.message);
+      process.exit(1);
+    }
+  }
+
   // Volitelný filtr: jen okno od dneška (+ N měsíců)
   if (fromToday || (windowMonths != null && Number.isFinite(windowMonths) && windowMonths > 0)) {
     const today = new Date();
     const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
-    const monthsAhead = windowMonths != null && Number.isFinite(windowMonths) && windowMonths > 0 ? windowMonths : 3;
+    const monthsAhead =
+      windowMonths != null && Number.isFinite(windowMonths) && windowMonths > 0
+        ? windowMonths
+        : defaultSearchWindowMonths;
     const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + monthsAhead, start.getUTCDate()));
 
     const inRange = (s) => {

@@ -1,5 +1,7 @@
 #!/bin/bash
-# Obnoví turnajový kalendář na 3 měsíce dopředu a naimportuje do Supabase.
+# Obnoví turnajový kalendář hybridně:
+# - search cache horizont (autocomplete): CACHE_WINDOW_MONTHS_SEARCH, default 18 měsíců
+# - factsheet enrichment (planning): CACHE_WINDOW_MONTHS_PLANNING, default 6 měsíců
 # Spouštět ručně nebo přes cron (např. 1. den v měsíci).
 #
 # Použití:
@@ -13,15 +15,18 @@ set -e
 cd "$(dirname "$0")/.."
 
 echo "=== refresh-tournaments.sh $(date) ==="
-echo "1. Stahuji kalendář (3 měsíce dopředu)..."
-node scripts/fetch-calendar-itf-juniors.js
+SEARCH_WINDOW_MONTHS="${CACHE_WINDOW_MONTHS_SEARCH:-18}"
+PLANNING_WINDOW_MONTHS="${CACHE_WINDOW_MONTHS_PLANNING:-6}"
+
+echo "1. Stahuji kalendář (${SEARCH_WINDOW_MONTHS} měsíců dopředu)..."
+node scripts/fetch-calendar-itf-juniors.js --months="${SEARCH_WINDOW_MONTHS}"
 
 echo "2. Stahuji factsheety a slučuji..."
 if [[ "$*" == *"--no-import"* ]]; then
-  node scripts/fetch-factsheets-bulk.js
+  node scripts/fetch-factsheets-bulk.js --planning-window-months="${PLANNING_WINDOW_MONTHS}" --search-window-months="${SEARCH_WINDOW_MONTHS}"
   echo "Hotovo (bez importu)."
 else
-  node scripts/fetch-factsheets-bulk.js --import
+  node scripts/fetch-factsheets-bulk.js --import --planning-window-months="${PLANNING_WINDOW_MONTHS}" --search-window-months="${SEARCH_WINDOW_MONTHS}"
   echo "Import do Supabase dokončen."
 fi
 

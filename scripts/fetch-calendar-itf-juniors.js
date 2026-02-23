@@ -4,11 +4,11 @@
  *
  * Použití:
  *   node scripts/fetch-calendar-itf-juniors.js [YYYY-MM]
- *   node scripts/fetch-calendar-itf-juniors.js [YYYY-MM] --months=3
+ *   node scripts/fetch-calendar-itf-juniors.js [YYYY-MM] --months=18
  *
- * Bez argumentu: aktuální měsíc + 3 měsíce dopředu (např. únor → únor, březen, duben).
+ * Bez argumentu: aktuální měsíc + CACHE_WINDOW_MONTHS_SEARCH (default 18 měsíců) dopředu.
  * S --months=N: stáhne N měsíců od zadaného (nebo aktuálního) měsíce.
- * Příklad: 2026-02 --months=3 → únor, březen, duben 2026.
+ * Příklad: 2026-02 --months=18 → únor 2026 až červenec 2027.
  *
  * Vyžaduje: npm install (puppeteer je v devDependencies)
  */
@@ -35,7 +35,8 @@ function getMonthsToFetch(startMonth, count) {
 function parseArgs() {
   const args = process.argv.slice(2);
   const monthsArg = args.find((a) => a.startsWith('--months='));
-  const months = monthsArg ? parseInt(monthsArg.split('=')[1], 10) : 3;
+  const defaultMonths = parseInt(process.env.CACHE_WINDOW_MONTHS_SEARCH || '18', 10);
+  const months = monthsArg ? parseInt(monthsArg.split('=')[1], 10) : defaultMonths;
   const startArg = args.find((a) => !a.startsWith('--') && /^\d{4}-\d{2}$/.test(a));
   const startMonth = startArg || DEFAULT_START;
   return { startMonth, months };
