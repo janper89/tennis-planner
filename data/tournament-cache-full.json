@@ -1,61 +1,5 @@
 [
   {
-    "tournamentKey": "itf-juniors-women-s-calendar-2026-02-01",
-    "tournamentName": "Women's Calendar",
-    "city": "N/A",
-    "startDate": "2026-02-01",
-    "category": null,
-    "factSheetUrl": null
-  },
-  {
-    "tournamentKey": "itf-juniors-men-s-calendar-2026-02-01",
-    "tournamentName": "Men's Calendar",
-    "city": "N/A",
-    "startDate": "2026-02-01",
-    "category": null,
-    "factSheetUrl": null
-  },
-  {
-    "tournamentKey": "itf-juniors-juniors-calendar-2026-02-01",
-    "tournamentName": "Juniors Calendar",
-    "city": "N/A",
-    "startDate": "2026-02-01",
-    "category": null,
-    "factSheetUrl": null
-  },
-  {
-    "tournamentKey": "itf-juniors-masters-tour-calendar-2026-02-01",
-    "tournamentName": "Masters Tour Calendar",
-    "city": "N/A",
-    "startDate": "2026-02-01",
-    "category": null,
-    "factSheetUrl": null
-  },
-  {
-    "tournamentKey": "itf-juniors-beach-tennis-calendar-2026-02-01",
-    "tournamentName": "Beach Tennis Calendar",
-    "city": "N/A",
-    "startDate": "2026-02-01",
-    "category": null,
-    "factSheetUrl": null
-  },
-  {
-    "tournamentKey": "itf-juniors-grand-slam-tournaments-2026-02-01",
-    "tournamentName": "Grand Slam tournaments",
-    "city": "N/A",
-    "startDate": "2026-02-01",
-    "category": null,
-    "factSheetUrl": null
-  },
-  {
-    "tournamentKey": "itf-juniors-results-2026-02-01",
-    "tournamentName": "Results",
-    "city": "N/A",
-    "startDate": "2026-02-01",
-    "category": null,
-    "factSheetUrl": null
-  },
-  {
     "tournamentKey": "j-jgs-aus-2026-001",
     "tournamentName": "Australian Open Junior Championships",
     "city": "N/A",
@@ -496,7 +440,7 @@
     "surface": "Hard - O"
   },
   {
-    "tournamentKey": "J-J100-KAZ-2026-001",
+    "tournamentKey": "j-j100-kaz-2026-001",
     "tournamentName": "J100 Karaganda",
     "city": "Karaganda",
     "startDate": "16 Feb, 2026",
@@ -504,22 +448,10 @@
     "factSheetUrl": "https://www.itftennis.com/en/tournament/j100-karaganda/kaz/2026/j-j100-kaz-2026-001/",
     "country": "Kazakhstan",
     "endDate": "2026-02-21",
-    "surface": "Hard - I",
-    "drawSize": "Boys: Singles qualifying: 32, Singles main draw: 32, Doubles main draw: 16 | Girls: Singles qualifying: 32, Singles main draw: 32, Doubles main draw: 16",
-    "singlesMainDrawFormat": "Elimination",
-    "entryDeadline": "Tue 27th January 2026 by 14:00GMT",
-    "withdrawalDeadline": "Tue 3rd February 2026 by 14:00GMT",
-    "mainDrawSignIn": "By 18:00 local time on 15 Feb 2026",
-    "qualifyingSignIn": "By 18:00 local time on 13th Feb 2026",
-    "firstDayQualifying": "14 February 2026",
-    "firstDayMainDraw": "16 February 2026",
-    "tournamentDirectorName": "Darkhan Zhanmukhambetov",
-    "tournamentDirectorEmail": "d.zhanmukhambetov@ktf.kz",
-    "officialBall": "Dunlop Australian Open (PET) (Type 2)",
-    "tournamentKeyFactsheet": "J-J100-KAZ-2026-001"
+    "surface": "Hard - I"
   },
   {
-    "tournamentKey": "J-J100-AUT-2026-002",
+    "tournamentKey": "j-j100-aut-2026-002",
     "tournamentName": "J100 Wolfsberg",
     "city": "Wolfsberg",
     "startDate": "16 Feb, 2026",
@@ -527,22 +459,10 @@
     "factSheetUrl": "https://www.itftennis.com/en/tournament/j100-wolfsberg/aut/2026/j-j100-aut-2026-002/",
     "country": "Austria",
     "endDate": "2026-02-21",
-    "surface": "Carpet - I",
-    "drawSize": "Boys: Singles qualifying: 32, Singles main draw: 32, Doubles main draw: 16 | Girls: Singles qualifying: 32, Singles main draw: 32, Doubles main draw: 16",
-    "singlesMainDrawFormat": "Elimination",
-    "entryDeadline": "Tue 27th January 2026 by 14:00GMT",
-    "withdrawalDeadline": "Tue 3rd February 2026 by 14:00GMT",
-    "mainDrawSignIn": "By 18:00 local time on 15 Feb 2026",
-    "qualifyingSignIn": "By 18:00 local time on 13th Feb 2026",
-    "firstDayQualifying": "14 February 2026",
-    "firstDayMainDraw": "16 February 2026",
-    "tournamentDirectorName": "Gernot Dreier",
-    "tournamentDirectorEmail": "dreier_gernot@hotmail.com",
-    "officialBall": "Dunlop ATP Tour Extra Duty (Type 2)",
-    "tournamentKeyFactsheet": "J-J100-AUT-2026-002"
+    "surface": "Carpet - I"
   },
   {
-    "tournamentKey": "J-J60-USA-2026-001",
+    "tournamentKey": "j-j60-usa-2026-001",
     "tournamentName": "J60 Claremont",
     "city": "Claremont",
     "startDate": "16 Feb, 2026",
@@ -550,22 +470,10 @@
     "factSheetUrl": "https://www.itftennis.com/en/tournament/j60-claremont/usa/2026/j-j60-usa-2026-001/",
     "country": "USA",
     "endDate": "2026-02-20",
-    "surface": "Hard - O",
-    "drawSize": "Boys: Singles qualifying: 32, Singles main draw: 32, Doubles main draw: 16 | Girls: Singles qualifying: 32, Singles main draw: 32, Doubles main draw: 16",
-    "singlesMainDrawFormat": "Elimination",
-    "entryDeadline": "Tue 27th January 2026 by 14:00GMT",
-    "withdrawalDeadline": "Tue 3rd February 2026 by 14:00GMT",
-    "mainDrawSignIn": "By 18:00 local time on 15 Feb 2026",
-    "qualifyingSignIn": "By 18:00 local time on 13th Feb 2026",
-    "firstDayQualifying": "14 February 2026",
-    "firstDayMainDraw": "16 February 2026",
-    "tournamentDirectorName": "Barry Friendman",
-    "tournamentDirectorEmail": "barryfriedman10s@gmail.com",
-    "officialBall": "Wilson Championship Extra Duty (Type 2)",
-    "tournamentKeyFactsheet": "J-J60-USA-2026-001"
+    "surface": "Hard - O"
   },
   {
-    "tournamentKey": "J-J60-MEX-2026-003",
+    "tournamentKey": "j-j60-mex-2026-003",
     "tournamentName": "J60 San Luis Potosi",
     "city": "San Luis Potosi",
     "startDate": "16 Feb, 2026",
@@ -573,22 +481,10 @@
     "factSheetUrl": "https://www.itftennis.com/en/tournament/j60-san-luis-potosi/mex/2026/j-j60-mex-2026-003/",
     "country": "Mexico",
     "endDate": "2026-02-21",
-    "surface": "Hard - O",
-    "drawSize": "Boys: Singles qualifying: 32, Singles main draw: 32, Doubles main draw: 16 | Girls: Singles qualifying: 16, Singles main draw: 32, Doubles main draw: 16",
-    "singlesMainDrawFormat": "Elimination",
-    "entryDeadline": "Tue 27th January 2026 by 14:00GMT",
-    "withdrawalDeadline": "Tue 3rd February 2026 by 14:00GMT",
-    "mainDrawSignIn": "By 18:00 local time on 15 Feb 2026",
-    "qualifyingSignIn": "By 18:00 local time on 13th Feb 2026",
-    "firstDayQualifying": "14 February 2026",
-    "firstDayMainDraw": "16 February 2026",
-    "tournamentDirectorName": "Olga Lidia Contreras",
-    "tournamentDirectorEmail": "contreraslidia09@gmail.com",
-    "officialBall": "Head Tour XT (Type 2)",
-    "tournamentKeyFactsheet": "J-J60-MEX-2026-003"
+    "surface": "Hard - O"
   },
   {
-    "tournamentKey": "J-J60-NOR-2026-001",
+    "tournamentKey": "j-j60-nor-2026-001",
     "tournamentName": "J60 Oslo",
     "city": "Oslo",
     "startDate": "16 Feb, 2026",
@@ -596,22 +492,10 @@
     "factSheetUrl": "https://www.itftennis.com/en/tournament/j60-oslo/nor/2026/j-j60-nor-2026-001/",
     "country": "Norway",
     "endDate": "2026-02-21",
-    "surface": "Hard - I",
-    "drawSize": "Boys: Singles qualifying: 32, Singles main draw: 8, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Doubles main draw: 16 | Girls: Singles qualifying: 32, Singles main draw: 8, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Doubles main draw: 16",
-    "singlesMainDrawFormat": "Round Robin > Elimination",
-    "entryDeadline": "Tue 27th January 2026 by 14:00GMT",
-    "withdrawalDeadline": "Tue 3rd February 2026 by 14:00GMT",
-    "mainDrawSignIn": "By 18:00 local time on 15 Feb 2026",
-    "qualifyingSignIn": "By 18:00 local time on 14th Feb 2026",
-    "firstDayQualifying": "15 February 2026",
-    "firstDayMainDraw": "16 February 2026",
-    "tournamentDirectorName": "Karin Dalbak",
-    "tournamentDirectorEmail": "karin@heming.no",
-    "officialBall": "Wilson US Open Extra Duty (Type 2)",
-    "tournamentKeyFactsheet": "J-J60-NOR-2026-001"
+    "surface": "Hard - I"
   },
   {
-    "tournamentKey": "J-J30-SUI-2026-002",
+    "tournamentKey": "j-j30-sui-2026-002",
     "tournamentName": "J30 Agno",
     "city": "Agno",
     "startDate": "16 Feb, 2026",
@@ -619,22 +503,10 @@
     "factSheetUrl": "https://www.itftennis.com/en/tournament/j30-agno/sui/2026/j-j30-sui-2026-002/",
     "country": "Switzerland",
     "endDate": "2026-02-21",
-    "surface": "Hard - I",
-    "drawSize": "Boys: Singles qualifying: 16, Singles main draw: 8, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Doubles main draw: 16 | Girls: Singles qualifying: 16, Singles main draw: 8, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Doubles main draw: 16",
-    "singlesMainDrawFormat": "Round Robin > Elimination",
-    "entryDeadline": "Tue 27th January 2026 by 14:00GMT",
-    "withdrawalDeadline": "Tue 3rd February 2026 by 14:00GMT",
-    "mainDrawSignIn": "By 18:00 local time on 15 Feb 2026",
-    "qualifyingSignIn": "By 18:00 local time on 14th Feb 2026",
-    "firstDayQualifying": "15 February 2026",
-    "firstDayMainDraw": "16 February 2026",
-    "tournamentDirectorName": "Christian Perrone",
-    "tournamentDirectorEmail": "christian@goacademy.club",
-    "officialBall": "Dunlop Fort All Court Tournament Select Swiss (Type 2)",
-    "tournamentKeyFactsheet": "J-J30-SUI-2026-002"
+    "surface": "Hard - I"
   },
   {
-    "tournamentKey": "J-J30-PER-2026-001",
+    "tournamentKey": "j-j30-per-2026-001",
     "tournamentName": "J30 Lima",
     "city": "Lima",
     "startDate": "16 Feb, 2026",
@@ -642,22 +514,10 @@
     "factSheetUrl": "https://www.itftennis.com/en/tournament/j30-lima/per/2026/j-j30-per-2026-001/",
     "country": "Peru",
     "endDate": "2026-02-21",
-    "surface": "Clay - O",
-    "drawSize": "Boys: Singles qualifying: 32, Singles main draw: 8, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Doubles main draw: 16 | Girls: Singles qualifying: 32, Singles main draw: 8, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Doubles main draw: 16",
-    "singlesMainDrawFormat": "Round Robin > Elimination",
-    "entryDeadline": "Tue 27th January 2026 by 14:00GMT",
-    "withdrawalDeadline": "Tue 3rd February 2026 by 14:00GMT",
-    "mainDrawSignIn": "By 18:00 local time on 15 Feb 2026",
-    "qualifyingSignIn": "By 18:00 local time on 14th Feb 2026",
-    "firstDayQualifying": "15 February 2026",
-    "firstDayMainDraw": "16 February 2026",
-    "tournamentDirectorName": "Willy Rojas",
-    "tournamentDirectorEmail": "jefaturadedeporte@clublawntennis.pe",
-    "officialBall": "Babolat Gold Championship (Type 2)",
-    "tournamentKeyFactsheet": "J-J30-PER-2026-001"
+    "surface": "Clay - O"
   },
   {
-    "tournamentKey": "J-J30-LUX-2026-001",
+    "tournamentKey": "j-j30-lux-2026-001",
     "tournamentName": "J30 Esch-sur-Alzette",
     "city": "Esch Sur Alzette",
     "startDate": "16 Feb, 2026",
@@ -665,19 +525,7 @@
     "factSheetUrl": "https://www.itftennis.com/en/tournament/j30-esch-sur-alzette/lux/2026/j-j30-lux-2026-001/",
     "country": "Luxembourg",
     "endDate": "2026-02-21",
-    "surface": "Hard - I",
-    "drawSize": "Boys: Singles qualifying: 32, Singles main draw: 32, Doubles main draw: 16 | Girls: Singles qualifying: 32, Singles main draw: 32, Doubles main draw: 16",
-    "singlesMainDrawFormat": "Elimination",
-    "entryDeadline": "Tue 27th January 2026 by 14:00GMT",
-    "withdrawalDeadline": "Tue 3rd February 2026 by 14:00GMT",
-    "mainDrawSignIn": "By 18:00 local time on 15 Feb 2026",
-    "qualifyingSignIn": "By 18:00 local time on 13th Feb 2026",
-    "firstDayQualifying": "14 February 2026",
-    "firstDayMainDraw": "16 February 2026",
-    "tournamentDirectorName": "Nitschke Muriel , Poos Carlo",
-    "tournamentDirectorEmail": "nitmur@icloud.com",
-    "officialBall": "Babolat Team (Type 2)",
-    "tournamentKeyFactsheet": "J-J30-LUX-2026-001"
+    "surface": "Hard - I"
   },
   {
     "tournamentKey": "J-J200-LTU-2026-001",
@@ -716,7 +564,7 @@
     "singlesMainDrawFormat": "Elimination",
     "entryDeadline": "Tue 27th January 2026 by 14:00GMT",
     "withdrawalDeadline": "Tue 3rd February 2026 by 14:00GMT",
-    "mainDrawSignIn": "By 18:00 local time on 16 Feb 2026",
+    "mainDrawSignIn": "Feb 16 2026 12:00AM",
     "qualifyingSignIn": "By 18:00 local time on 14th Feb 2026",
     "firstDayQualifying": "15 February 2026",
     "firstDayMainDraw": "17 February 2026",
@@ -758,7 +606,7 @@
     "country": "Nigeria",
     "endDate": "2026-02-22",
     "surface": "Hard - O",
-    "drawSize": "Boys: Singles qualifying: 16, Singles main draw: 8, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Doubles main draw: 16 | Girls: Singles qualifying: 16, Singles main draw: 16, Doubles main draw: 8",
+    "drawSize": "Boys: Singles qualifying: 16, Singles main draw: 8, Singles main draw: 3, Singles main draw: 3, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Doubles main draw: 16 | Girls: Singles qualifying: 16, Singles main draw: 16, Doubles main draw: 8",
     "singlesMainDrawFormat": "Round Robin > Elimination",
     "entryDeadline": "Tue 27th January 2026 by 14:00GMT",
     "withdrawalDeadline": "Tue 3rd February 2026 by 14:00GMT",
@@ -871,7 +719,7 @@
     "country": "Peru",
     "endDate": "2026-02-28",
     "surface": "Clay - O",
-    "drawSize": "Boys: Singles qualifying: 16, Singles main draw: 32, Doubles main draw: 16 | Girls: Singles qualifying: 16, Singles main draw: 32, Doubles main draw: 16",
+    "drawSize": "Boys: Singles qualifying: 16, Singles main draw: 8, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Doubles main draw: 16 | Girls: Singles qualifying: 16, Singles main draw: 8, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Singles main draw: 4, Doubles main draw: 16",
     "singlesMainDrawFormat": "Round Robin > Elimination",
     "entryDeadline": "Tue 3rd February 2026 by 14:00GMT",
     "withdrawalDeadline": "Tue 10th February 2026 by 14:00GMT",
@@ -1067,62 +915,6 @@
     "tournamentDirectorEmail": "juniorentour@focustennisacademy.nl",
     "officialBall": "Yonex Championship (Type 2)",
     "tournamentKeyFactsheet": "J-J30-NED-2026-001"
-  },
-  {
-    "tournamentKey": "itf-juniors-women-s-calendar-2026-03-01",
-    "tournamentName": "Women's Calendar",
-    "city": "N/A",
-    "startDate": "2026-03-01",
-    "category": null,
-    "factSheetUrl": null
-  },
-  {
-    "tournamentKey": "itf-juniors-men-s-calendar-2026-03-01",
-    "tournamentName": "Men's Calendar",
-    "city": "N/A",
-    "startDate": "2026-03-01",
-    "category": null,
-    "factSheetUrl": null
-  },
-  {
-    "tournamentKey": "itf-juniors-juniors-calendar-2026-03-01",
-    "tournamentName": "Juniors Calendar",
-    "city": "N/A",
-    "startDate": "2026-03-01",
-    "category": null,
-    "factSheetUrl": null
-  },
-  {
-    "tournamentKey": "itf-juniors-masters-tour-calendar-2026-03-01",
-    "tournamentName": "Masters Tour Calendar",
-    "city": "N/A",
-    "startDate": "2026-03-01",
-    "category": null,
-    "factSheetUrl": null
-  },
-  {
-    "tournamentKey": "itf-juniors-beach-tennis-calendar-2026-03-01",
-    "tournamentName": "Beach Tennis Calendar",
-    "city": "N/A",
-    "startDate": "2026-03-01",
-    "category": null,
-    "factSheetUrl": null
-  },
-  {
-    "tournamentKey": "itf-juniors-grand-slam-tournaments-2026-03-01",
-    "tournamentName": "Grand Slam tournaments",
-    "city": "N/A",
-    "startDate": "2026-03-01",
-    "category": null,
-    "factSheetUrl": null
-  },
-  {
-    "tournamentKey": "itf-juniors-results-2026-03-01",
-    "tournamentName": "Results",
-    "city": "N/A",
-    "startDate": "2026-03-01",
-    "category": null,
-    "factSheetUrl": null
   },
   {
     "tournamentKey": "J-J100-MDA-2026-002",
@@ -1397,7 +1189,7 @@
     "firstDayMainDraw": "02 March 2026",
     "tournamentDirectorName": "Anders Borg",
     "tournamentDirectorEmail": "anders@northern-vision.co.uk",
-    "officialBall": "TBC",
+    "officialBall": "Wilson US Open Extra Duty (Type 2)",
     "tournamentKeyFactsheet": "J-J30-NOR-2026-001"
   },
   {
@@ -1834,7 +1626,7 @@
     "firstDayMainDraw": "09 March 2026",
     "tournamentDirectorName": "Vardan Zakaryan",
     "tournamentDirectorEmail": "tennisarmenia@email.com",
-    "officialBall": "Babolat Gold All Court (Type 2)",
+    "officialBall": "Head Tour XT (Type 2)",
     "tournamentKeyFactsheet": "J-J30-ARM-2026-001"
   },
   {
@@ -1916,7 +1708,7 @@
     "country": "Brazil",
     "endDate": "2026-03-22",
     "surface": "Clay - O",
-    "drawSize": "Boys: Singles qualifying: 32, Singles main draw: 48, Doubles main draw: 24 | Girls: Singles qualifying: 32, Singles main draw: 48, Doubles main draw: 24",
+    "drawSize": "Boys: Singles qualifying: 48, Singles main draw: 48, Doubles main draw: 24 | Girls: Singles qualifying: 48, Singles main draw: 48, Doubles main draw: 24",
     "singlesMainDrawFormat": "Elimination",
     "entryDeadline": "Tue 3rd February 2026 by 14:00GMT",
     "withdrawalDeadline": "Tue 3rd March 2026 by 14:00GMT",
@@ -2167,7 +1959,7 @@
     "category": "J30",
     "factSheetUrl": "https://www.itftennis.com/en/tournament/j30-cayenne-(french-guiana)/fgu/2026/j-j30-fgu-2026-001/",
     "country": "French Guiana",
-    "endDate": "2026-03-22",
+    "endDate": "2026-03-21",
     "surface": "Hard - I",
     "drawSize": "Boys: Singles qualifying: 16, Singles main draw: 32, Doubles main draw: 16 | Girls: Singles qualifying: 16, Singles main draw: 32, Doubles main draw: 16",
     "singlesMainDrawFormat": "Round Robin > Elimination",
@@ -2545,7 +2337,7 @@
     "firstDayMainDraw": "23 March 2026",
     "tournamentDirectorName": "Petja Nykänen",
     "tournamentDirectorEmail": "petja.nykanen@vierumaki.fi",
-    "officialBall": "Yonex Tour  (Type 2)",
+    "officialBall": "Yonex Tour (Type 2)",
     "tournamentKeyFactsheet": "J-J30-FIN-2026-001"
   },
   {
@@ -2938,62 +2730,6 @@
     "tournamentDirectorEmail": "grancanariayellowbowl@gmail.com",
     "officialBall": "Head ATP (Type 2)",
     "tournamentKeyFactsheet": "J-J60-ESP-2026-005"
-  },
-  {
-    "tournamentKey": "itf-juniors-women-s-calendar-2026-04-01",
-    "tournamentName": "Women's Calendar",
-    "city": "N/A",
-    "startDate": "2026-04-01",
-    "category": null,
-    "factSheetUrl": null
-  },
-  {
-    "tournamentKey": "itf-juniors-men-s-calendar-2026-04-01",
-    "tournamentName": "Men's Calendar",
-    "city": "N/A",
-    "startDate": "2026-04-01",
-    "category": null,
-    "factSheetUrl": null
-  },
-  {
-    "tournamentKey": "itf-juniors-juniors-calendar-2026-04-01",
-    "tournamentName": "Juniors Calendar",
-    "city": "N/A",
-    "startDate": "2026-04-01",
-    "category": null,
-    "factSheetUrl": null
-  },
-  {
-    "tournamentKey": "itf-juniors-masters-tour-calendar-2026-04-01",
-    "tournamentName": "Masters Tour Calendar",
-    "city": "N/A",
-    "startDate": "2026-04-01",
-    "category": null,
-    "factSheetUrl": null
-  },
-  {
-    "tournamentKey": "itf-juniors-beach-tennis-calendar-2026-04-01",
-    "tournamentName": "Beach Tennis Calendar",
-    "city": "N/A",
-    "startDate": "2026-04-01",
-    "category": null,
-    "factSheetUrl": null
-  },
-  {
-    "tournamentKey": "itf-juniors-grand-slam-tournaments-2026-04-01",
-    "tournamentName": "Grand Slam tournaments",
-    "city": "N/A",
-    "startDate": "2026-04-01",
-    "category": null,
-    "factSheetUrl": null
-  },
-  {
-    "tournamentKey": "itf-juniors-results-2026-04-01",
-    "tournamentName": "Results",
-    "city": "N/A",
-    "startDate": "2026-04-01",
-    "category": null,
-    "factSheetUrl": null
   },
   {
     "tournamentKey": "J-J300-EGY-2026-001",
@@ -3935,7 +3671,7 @@
     "firstDayMainDraw": "13 April 2026",
     "tournamentDirectorName": "Lori Giuggio",
     "tournamentDirectorEmail": "lorigiuggio13@gmail.com",
-    "officialBall": "Wilson Championship Extra Duty (2 ball) (Type 2)",
+    "officialBall": "Wilson Championship Regular Duty (Type 2)",
     "tournamentKeyFactsheet": "J-J60-USA-2026-002"
   },
   {
@@ -4694,7 +4430,7 @@
     "firstDayMainDraw": "21 April 2026",
     "tournamentDirectorName": "Mr. Gabor Galambos",
     "tournamentDirectorEmail": "galaga0611@gmail.com",
-    "officialBall": "TBC",
+    "officialBall": "Wilson Roland Garros Clay Court (Type 2)",
     "tournamentKeyFactsheet": "J-J30-HUN-2026-001"
   },
   {
