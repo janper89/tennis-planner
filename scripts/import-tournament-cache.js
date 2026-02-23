@@ -37,7 +37,6 @@ const windowMonthsArg = args.find((a) => a.startsWith('--window-months='));
 const windowMonths = windowMonthsArg ? parseInt(windowMonthsArg.split('=')[1], 10) : null;
 const fileArg = args.find((a) => !a.startsWith('--'));
 const overridesPath = path.join(process.cwd(), 'data', 'tournament-cache-overrides.json');
-const defaultSearchWindowMonths = parseInt(process.env.CACHE_WINDOW_MONTHS_SEARCH || '18', 10);
 
 // Načtení .env.local z kořene projektu (cesta vůči umístění skriptu)
 const envPath = path.resolve(__dirname, '..', '.env.local');
@@ -61,6 +60,7 @@ try {
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const defaultSearchWindowMonths = parseInt(process.env.CACHE_WINDOW_MONTHS_SEARCH || '18', 10);
 
 if (!url || !serviceKey) {
   console.error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY (use .env.local or export)');
@@ -129,9 +129,73 @@ function inferCityFromTournamentName(name) {
   return titleCaseWords(raw);
 }
 
+function parseCanonicalTournamentKeyFromFactsheetUrl(factSheetUrl) {
+  if (!factSheetUrl || typeof factSheetUrl !== 'string') return null;
+  const m = factSheetUrl.match(/\/(j-[a-z0-9-]+-\d{4}-\d{3})\/?$/i);
+  if (!m) return null;
+  return m[1].toUpperCase();
+}
+
+function hasFactsheetFields(row) {
+  if (!row || typeof row !== 'object') return false;
+  return !!(
+    row.entry_deadline ||
+    row.withdrawal_deadline ||
+    row.tournament_director_name ||
+    row.official_ball ||
+    row.draw_size
+  );
+}
+
+function normalizeForGroup(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function isoWeekKey(dateIso) {
+  if (!dateIso || typeof dateIso !== 'string') return 'unknown-week';
+  const d = new Date(`${dateIso}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return 'unknown-week';
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+function qualityScore(row) {
+  let score = 0;
+  if (!row) return score;
+  if (hasFactsheetFields(row)) score += 100;
+  if (row.tournament_key_factsheet) score += 30;
+  if (row.tournament_key && /^J-[A-Z0-9-]+$/.test(row.tournament_key)) score += 15;
+  if (row.country) score += 3;
+  if (row.venue) score += 3;
+  if (row.end_date) score += 2;
+  return score;
+}
+
+function preferBetterRow(a, b) {
+  const qa = qualityScore(a);
+  const qb = qualityScore(b);
+  if (qa !== qb) return qa > qb ? a : b;
+  const da = (a.start_date || '').localeCompare(b.start_date || '');
+  if (da !== 0) return da <= 0 ? a : b;
+  return String(a.tournament_key || '') <= String(b.tournament_key || '') ? a : b;
+}
+
 /** Map row from extract or DB format to tournament_cache insert shape */
 function toCacheRow(item) {
-  const tournament_key = item.tournament_key ?? item.tournamentKey ?? null;
+  const canonicalKeyFromUrl = parseCanonicalTournamentKeyFromFactsheetUrl(
+    item.factSheetUrl ?? item.fact_sheet_url ?? item.factsheet_url
+  );
+  const sourceKey = item.tournament_key ?? item.tournamentKey ?? null;
+  const tournament_key =
+    canonicalKeyFromUrl ||
+    (typeof sourceKey === 'string' ? sourceKey.toUpperCase() : sourceKey);
   const name = normalizeTournamentName(item.name ?? item.tournamentName ?? '');
   const rawCity = (item.city || '').trim();
   const inferredCity =
@@ -168,7 +232,11 @@ function toCacheRow(item) {
     tournament_director_name: item.tournament_director_name ?? item.tournamentDirectorName ?? undefined,
     tournament_director_email: item.tournament_director_email ?? item.tournamentDirectorEmail ?? undefined,
     official_ball: item.official_ball ?? item.officialBall ?? undefined,
-    tournament_key_factsheet: item.tournament_key_factsheet ?? item.tournamentKeyFactsheet ?? undefined,
+    tournament_key_factsheet:
+      item.tournament_key_factsheet ??
+      item.tournamentKeyFactsheet ??
+      canonicalKeyFromUrl ??
+      undefined,
   };
 
   // Remove undefined so Supabase doesn't send them (avoids overwriting with null)
@@ -177,6 +245,25 @@ function toCacheRow(item) {
     if (v !== undefined && v !== null && v !== '') out[k] = v;
   }
   return out;
+}
+
+function dedupeRowsByGroup(rows) {
+  const byGroup = new Map();
+  for (const row of rows) {
+    const groupKey = [
+      normalizeForGroup(row.name),
+      normalizeForGroup(row.city),
+      normalizeForGroup(row.category || ''),
+      isoWeekKey(row.start_date),
+    ].join('|');
+    const existing = byGroup.get(groupKey);
+    if (!existing) {
+      byGroup.set(groupKey, row);
+      continue;
+    }
+    byGroup.set(groupKey, preferBetterRow(existing, row));
+  }
+  return Array.from(byGroup.values());
 }
 
 async function main() {
@@ -251,6 +338,10 @@ async function main() {
   const byKey = new Map();
   for (const row of rows) byKey.set(row.tournament_key, row);
   rows = Array.from(byKey.values());
+
+  // Deduplikace podle normalizovaného klíče name+city+category+week
+  // Preferujeme kvalitnější (factsheet) záznam.
+  rows = dedupeRowsByGroup(rows);
 
   // Volitelné ruční overrides (pro případy, kdy ITF feed vrací neúplná data)
   if (fs.existsSync(overridesPath)) {

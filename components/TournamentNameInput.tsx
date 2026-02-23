@@ -50,7 +50,6 @@ export default function TournamentNameInput({
       setError(null);
       try {
         const results = await searchTournamentsByName(supabase, trimmedQuery, 20);
-        console.log('Tournament search results:', { query: trimmedQuery, count: results.length, results });
         setSuggestions(results);
         setIsOpen(results.length > 0);
         setHighlightedIndex(-1);

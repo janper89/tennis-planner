@@ -20,6 +20,7 @@ import {
   type ITFTournamentSearchResult,
 } from '@/lib/tournament-service';
 import TournamentNameInput from '@/components/TournamentNameInput';
+import TournamentFactsheetDetails from '@/components/TournamentFactsheetDetails';
 
 type Player = Database['public']['Tables']['player']['Row'];
 type Tournament = Database['public']['Tables']['tournament']['Row'];
@@ -1273,55 +1274,18 @@ export default function ParentDashboard({
                                 </div>
                                 {entry.tournament.entry_deadline && (
                                   <div>
-                                    <span className="font-medium">
-                                      Uzávěrka:
-                                    </span>{' '}
+                                    <span className="font-medium">Uzávěrka:</span>{' '}
                                     {formatDate(entry.tournament.entry_deadline)}
                                   </div>
                                 )}
                                 {entry.tournament.withdraw_deadline && (
                                   <div>
-                                    <span className="font-medium">
-                                      Odhlášení do:
-                                    </span>{' '}
-                                    {formatDate(
-                                      entry.tournament.withdraw_deadline
-                                    )}
-                                  </div>
-                                )}
-                                {entry.tournament.sign_in_deadline_text && (
-                                  <div>
-                                    <span className="font-medium">
-                                      Přihlášky (ITF):
-                                    </span>{' '}
-                                    {entry.tournament.sign_in_deadline_text}
-                                  </div>
-                                )}
-                                {entry.tournament.tournament_director_name && (
-                                  <div>
-                                    <span className="font-medium">
-                                      Ředitel:
-                                    </span>{' '}
-                                    {entry.tournament.tournament_director_name}
-                                  </div>
-                                )}
-                                {entry.tournament.official_ball && (
-                                  <div>
-                                    <span className="font-medium">
-                                      Míček:
-                                    </span>{' '}
-                                    {entry.tournament.official_ball}
-                                  </div>
-                                )}
-                                {entry.tournament.draw_size && (
-                                  <div>
-                                    <span className="font-medium">
-                                      Draw:
-                                    </span>{' '}
-                                    {entry.tournament.draw_size}
+                                    <span className="font-medium">Odhlášení do:</span>{' '}
+                                    {formatDate(entry.tournament.withdraw_deadline)}
                                   </div>
                                 )}
                               </div>
+                              <TournamentFactsheetDetails tournament={entry.tournament} />
                               {entry.poznamka_rodic && (
                                 <div className="mt-2 text-sm text-gray-600">
                                   <span className="font-medium">Poznámka:</span>{' '}

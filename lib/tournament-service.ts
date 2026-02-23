@@ -21,6 +21,7 @@ type TournamentCacheRow = {
   withdrawal_deadline?: string | null;
   tournament_director_name?: string | null;
   official_ball?: string | null;
+  tournament_key_factsheet?: string | null;
 };
 
 /**
@@ -66,6 +67,214 @@ function mapCacheRowToSearchResult(row: TournamentCacheRow): ITFTournamentSearch
   };
 }
 
+function isCanonicalTournamentKey(key?: string | null): boolean {
+  return !!key && /^J-[A-Z0-9-]+$/.test(key);
+}
+
+function tournamentMetadataScore(tournament: Tournament): number {
+  let score = 0;
+  if (tournament.sign_in_deadline_text) score += 2;
+  if (tournament.withdrawal_deadline_text) score += 2;
+  if (tournament.tournament_director_name) score += 2;
+  if (tournament.official_ball) score += 2;
+  if (tournament.draw_size) score += 2;
+  if (isCanonicalTournamentKey(tournament.tournament_key)) score += 3;
+  return score;
+}
+
+function buildTournamentEnrichmentUpdate(
+  existing: Tournament,
+  source: ITFTournamentSearchResult
+): Partial<TournamentInsertType> {
+  const patch: Partial<TournamentInsertType> = {};
+  const normalizedName = normalizeTournamentName(source.name);
+
+  if (!existing.nazev && normalizedName) patch.nazev = normalizedName;
+  if (!existing.kategorie && source.category) patch.kategorie = source.category;
+  if (!existing.misto && source.city) patch.misto = source.city;
+  if (!existing.datum && source.startDate) patch.datum = source.startDate;
+  if (!existing.sign_in_deadline_text && source.entryDeadline) {
+    patch.sign_in_deadline_text = source.entryDeadline;
+  }
+  if (!existing.withdrawal_deadline_text && source.withdrawalDeadline) {
+    patch.withdrawal_deadline_text = source.withdrawalDeadline;
+  }
+  if (!existing.tournament_director_name && source.tournamentDirectorName) {
+    patch.tournament_director_name = source.tournamentDirectorName;
+  }
+  if (!existing.official_ball && source.officialBall) {
+    patch.official_ball = source.officialBall;
+  }
+  if (!existing.draw_size && source.drawSize) {
+    patch.draw_size = source.drawSize;
+  }
+
+  // Upgrade legacy cache key to canonical ITF key where safe.
+  if (
+    source.tournamentKey &&
+    isCanonicalTournamentKey(source.tournamentKey) &&
+    !existing.tournament_key
+  ) {
+    patch.tournament_key = source.tournamentKey;
+  }
+
+  return patch;
+}
+
+async function enrichTournamentIfMissing(
+  existing: Tournament,
+  source: ITFTournamentSearchResult,
+  supabase: SupabaseClient<Database>
+): Promise<Tournament> {
+  const update = buildTournamentEnrichmentUpdate(existing, source);
+  if (Object.keys(update).length === 0) return existing;
+
+  const { data, error } = await supabase
+    .from('tournament')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase Update infers never when DB types are out of sync
+    .update(update as any)
+    .eq('id', existing.id)
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return data ?? existing;
+}
+
+async function findTournamentBySemanticMatch(
+  search: ITFTournamentSearchResult,
+  supabase: SupabaseClient<Database>
+): Promise<Tournament | null> {
+  const normalizedName = normalizeTournamentName(search.name);
+  const category = search.category || 'N/A';
+  const baseDate = new Date(`${search.startDate}T00:00:00Z`);
+  if (Number.isNaN(baseDate.getTime())) return null;
+
+  const from = new Date(baseDate);
+  from.setUTCDate(from.getUTCDate() - 14);
+  const to = new Date(baseDate);
+  to.setUTCDate(to.getUTCDate() + 14);
+
+  const { data, error } = await supabase
+    .from('tournament')
+    .select('*')
+    .ilike('nazev', `%${normalizedName}%`)
+    .eq('misto', search.city)
+    .eq('kategorie', category)
+    .gte('datum', from.toISOString().slice(0, 10))
+    .lte('datum', to.toISOString().slice(0, 10))
+    .limit(10);
+
+  if (error || !data || data.length === 0) return null;
+
+  const scored = [...data].sort((a, b) => {
+    const dateA = new Date(`${a.datum}T00:00:00Z`).getTime();
+    const dateB = new Date(`${b.datum}T00:00:00Z`).getTime();
+    const distanceA = Math.abs(dateA - baseDate.getTime());
+    const distanceB = Math.abs(dateB - baseDate.getTime());
+    if (distanceA !== distanceB) return distanceA - distanceB;
+    return tournamentMetadataScore(b) - tournamentMetadataScore(a);
+  });
+
+  return scored[0] ?? null;
+}
+
+function normalizeSearchText(value: string): string {
+  return (value || '')
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function isoWeekKey(dateIso: string): string {
+  const d = new Date(`${dateIso}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return 'unknown-week';
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+function hasRichMetadata(row: TournamentCacheRow): boolean {
+  return !!(
+    row.entry_deadline ||
+    row.withdrawal_deadline ||
+    row.tournament_director_name ||
+    row.official_ball ||
+    row.draw_size
+  );
+}
+
+function extractCategoryToken(query: string): string | null {
+  const m = query.toUpperCase().match(/\b([JW]\d{2,3})\b/);
+  return m ? m[1] : null;
+}
+
+function rankAndDedupeMatches(
+  rows: TournamentCacheRow[],
+  query: string,
+  limit: number
+): TournamentCacheRow[] {
+  const normalizedQuery = normalizeSearchText(query);
+  const categoryToken = extractCategoryToken(query);
+  const queryTokens = normalizedQuery.split(' ').filter(Boolean);
+
+  const scoreRow = (row: TournamentCacheRow): number => {
+    const nameNorm = normalizeSearchText(row.name);
+    const cityNorm = normalizeSearchText(row.city);
+    const categoryNorm = (row.category || '').toUpperCase();
+    let score = 0;
+
+    if (categoryToken && categoryNorm === categoryToken) score += 40;
+    if (nameNorm.startsWith(normalizedQuery)) score += 30;
+    if (nameNorm.includes(normalizedQuery)) score += 20;
+    if (cityNorm.includes(normalizedQuery)) score += 8;
+
+    for (const token of queryTokens) {
+      if (nameNorm.includes(token)) score += 6;
+      if (cityNorm.includes(token)) score += 3;
+    }
+
+    if (hasRichMetadata(row)) score += 25;
+    if (row.tournament_key_factsheet) score += 8;
+    if (/^J-[A-Z0-9-]+$/.test(row.tournament_key)) score += 6;
+    return score;
+  };
+
+  const sorted = [...rows].sort((a, b) => {
+    const diff = scoreRow(b) - scoreRow(a);
+    if (diff !== 0) return diff;
+    return a.start_date.localeCompare(b.start_date);
+  });
+
+  const byGroup = new Map<string, TournamentCacheRow>();
+  for (const row of sorted) {
+    const groupKey = [
+      normalizeSearchText(row.name),
+      normalizeSearchText(row.city),
+      normalizeSearchText(row.category || ''),
+      isoWeekKey(row.start_date),
+    ].join('|');
+    const existing = byGroup.get(groupKey);
+    if (!existing) {
+      byGroup.set(groupKey, row);
+      continue;
+    }
+    const preferCurrent = scoreRow(row) > scoreRow(existing);
+    if (preferCurrent) byGroup.set(groupKey, row);
+  }
+
+  return Array.from(byGroup.values())
+    .sort((a, b) => {
+      const diff = scoreRow(b) - scoreRow(a);
+      if (diff !== 0) return diff;
+      return a.start_date.localeCompare(b.start_date);
+    })
+    .slice(0, limit);
+}
+
 /**
  * Parameters for registering a player for a tournament
  */
@@ -107,22 +316,8 @@ export async function searchTournamentByName(
     const query = name.trim();
     if (!query) return null;
 
-    const { data, error } = await supabase
-      .from('tournament_cache')
-      .select('tournament_key, name, city, start_date, category, country, venue, end_date, draw_size, entry_deadline, withdrawal_deadline, tournament_director_name, official_ball')
-      .ilike('name', `%${query}%`)
-      .limit(1)
-      .maybeSingle();
-
-    if (error) {
-      console.error('Error searching tournament cache:', error);
-      return null;
-    }
-
-    const row = data as TournamentCacheRow | null;
-    if (!row) return null;
-
-    return mapCacheRowToSearchResult(row);
+    const results = await searchTournamentsByName(supabase, query, 1);
+    return results[0] ?? null;
   } catch (error) {
     console.error('Error searching tournament:', error);
     return null;
@@ -145,14 +340,13 @@ export async function searchTournamentsByName(
     const query = name.trim();
     if (!query) return [];
 
-    // Použij základní sloupce, které určitě existují v tournament_cache
-    // Rozšířené sloupce (country, venue, draw_size, atd.) jsou volitelné a přidávají se až v factsheet migraci
+    // Sloupce factsheetu zvyšují kvalitu řazení výsledků, ale cache zůstává použitelná i bez nich.
     const { data, error } = await supabase
       .from('tournament_cache')
-      .select('tournament_key, name, city, start_date, category')
+      .select('tournament_key, name, city, start_date, category, country, venue, end_date, draw_size, entry_deadline, withdrawal_deadline, tournament_director_name, official_ball, tournament_key_factsheet')
       .or(`name.ilike.%${query}%,city.ilike.%${query}%`)
       .order('start_date', { ascending: true })
-      .limit(limit);
+      .limit(Math.max(limit * 4, 80));
 
     if (error) {
       console.error('Error searching tournament cache:', error);
@@ -164,7 +358,8 @@ export async function searchTournamentsByName(
     }
 
     const rows = (data ?? []) as TournamentCacheRow[];
-    return rows.map((row) => mapCacheRowToSearchResult(row));
+    const rankedRows = rankAndDedupeMatches(rows, query, limit);
+    return rankedRows.map((row) => mapCacheRowToSearchResult(row));
   } catch (error) {
     console.error('Error searching tournaments:', error);
     return [];
@@ -355,6 +550,17 @@ export async function registerPlayerForTournament(
     
     if (searchResult.tournamentKey) {
       tournament = await findTournamentByKey(searchResult.tournamentKey, supabase);
+    }
+    if (tournament) {
+      tournament = await enrichTournamentIfMissing(tournament, searchResult, supabase);
+    }
+
+    // Fallback: semantic match (same name/city/category around the same date)
+    if (!tournament) {
+      tournament = await findTournamentBySemanticMatch(searchResult, supabase);
+      if (tournament) {
+        tournament = await enrichTournamentIfMissing(tournament, searchResult, supabase);
+      }
     }
 
     // Step 3: Create tournament if it doesn't exist

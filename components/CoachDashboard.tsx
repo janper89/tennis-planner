@@ -19,6 +19,7 @@ import {
   type ITFTournamentSearchResult,
 } from '@/lib/tournament-service';
 import TournamentNameInput from '@/components/TournamentNameInput';
+import TournamentFactsheetDetails from '@/components/TournamentFactsheetDetails';
 
 type Player = Database['public']['Tables']['player']['Row'];
 type Tournament = Database['public']['Tables']['tournament']['Row'];
@@ -1195,37 +1196,7 @@ export default function CoachDashboard({
                                     </span>
                                   )}
                                 </p>
-                                {(entry.tournament.sign_in_deadline_text ||
-                                  entry.tournament.tournament_director_name ||
-                                  entry.tournament.official_ball ||
-                                  entry.tournament.draw_size) && (
-                                  <div className="mt-2 border-t border-gray-200 pt-2 text-xs text-gray-500">
-                                    {entry.tournament.sign_in_deadline_text && (
-                                      <p>
-                                        <span className="font-medium">Přihlášky:</span>{' '}
-                                        {entry.tournament.sign_in_deadline_text}
-                                      </p>
-                                    )}
-                                    {entry.tournament.tournament_director_name && (
-                                      <p>
-                                        <span className="font-medium">Ředitel:</span>{' '}
-                                        {entry.tournament.tournament_director_name}
-                                      </p>
-                                    )}
-                                    {entry.tournament.official_ball && (
-                                      <p>
-                                        <span className="font-medium">Míček:</span>{' '}
-                                        {entry.tournament.official_ball}
-                                      </p>
-                                    )}
-                                    {entry.tournament.draw_size && (
-                                      <p>
-                                        <span className="font-medium">Draw:</span>{' '}
-                                        {entry.tournament.draw_size}
-                                      </p>
-                                    )}
-                                  </div>
-                                )}
+                                <TournamentFactsheetDetails tournament={entry.tournament} />
                               </div>
                               <div className="flex flex-wrap gap-2">
                                 <button
