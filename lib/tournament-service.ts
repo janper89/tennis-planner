@@ -131,8 +131,8 @@ async function enrichTournamentIfMissing(
 
   const { data, error } = await supabase
     .from('tournament')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase Update infers never when DB types are out of sync
-    .update(update as any)
+    // Supabase types can infer never for update payload in some environments.
+    .update(update as never)
     .eq('id', existing.id)
     .select('*')
     .single();
