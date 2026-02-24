@@ -6,11 +6,16 @@ export async function adjustManualPlayedAdjustment(
   playerId: string,
   delta: number
 ): Promise<number> {
-  const { data: player, error: readError } = await supabase
+  const { data, error: readError } = await supabase
     .from('player')
     .select('manual_played_adjustment')
     .eq('id', playerId)
     .single();
+
+  const player = data as Pick<
+    Database['public']['Tables']['player']['Row'],
+    'manual_played_adjustment'
+  > | null;
 
   if (readError || !player) {
     throw new Error(readError?.message || 'Hráč nebyl nalezen');
