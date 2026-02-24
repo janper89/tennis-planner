@@ -62,6 +62,7 @@ export default function ManagerDashboard({
   } | null>(null);
   const [generateCodeLoadingPlayerId, setGenerateCodeLoadingPlayerId] = useState<string | null>(null);
   const [unlinkParentLoadingPlayerId, setUnlinkParentLoadingPlayerId] = useState<string | null>(null);
+  const [deletePlayerLoadingId, setDeletePlayerLoadingId] = useState<string | null>(null);
   const [showAddTournamentForm, setShowAddTournamentForm] = useState(false);
   const [selectedPlayerForAdd, setSelectedPlayerForAdd] = useState<Player | null>(null);
   const [tournamentNameValue, setTournamentNameValue] = useState('');
@@ -249,6 +250,27 @@ export default function ManagerDashboard({
       }
     } finally {
       setUnlinkParentLoadingPlayerId(null);
+    }
+  };
+
+  const handleDeletePlayer = async (player: Player) => {
+    const entryCount = entriesByPlayer[player.id]?.length ?? 0;
+    const msg =
+      entryCount > 0
+        ? `Opravdu smazat hráče ${player.name}? Smažou se i všechny jeho přihlášky na turnaje (${entryCount}).`
+        : `Opravdu smazat hráče ${player.name}?`;
+    if (!confirm(msg)) return;
+    setDeletePlayerLoadingId(player.id);
+    try {
+      const { error } = await supabase.from('player').delete().eq('id', player.id);
+      if (error) {
+        alert('Chyba při mazání hráče: ' + error.message);
+        return;
+      }
+      setPlayers((prev) => prev.filter((p) => p.id !== player.id));
+      setEntries((prev) => prev.filter((e) => e.player_id !== player.id));
+    } finally {
+      setDeletePlayerLoadingId(null);
     }
   };
 
@@ -789,6 +811,15 @@ export default function ManagerDashboard({
                           {isGenerating ? 'Generuji…' : 'Vygenerovat kód pro rodiče'}
                         </button>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => handleDeletePlayer(player)}
+                        disabled={isUnlinking || isGenerating || deletePlayerLoadingId === player.id}
+                        className="rounded border border-gray-300 bg-gray-50 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                        title="Trvale smazat hráče a jeho přihlášky"
+                      >
+                        {deletePlayerLoadingId === player.id ? 'Mažu…' : 'Smazat hráče'}
+                      </button>
                     </div>
                   </div>
                   {showGeneratedCode && generatedCodeForPlayer && (
