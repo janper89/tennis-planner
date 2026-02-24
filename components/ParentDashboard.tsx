@@ -556,7 +556,8 @@ export default function ParentDashboard({
         result.player_name ? `Připojeno dítě: ${result.player_name}` : 'Dítě bylo připojeno.'
       );
       setConnectionCode('');
-      router.refresh();
+      // Parent data are loaded client-side; force reload so newly linked child appears immediately.
+      window.location.reload();
     } catch (err) {
       console.error(err);
       setConnectionError('Došlo k chybě');
