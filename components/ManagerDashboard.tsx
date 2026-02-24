@@ -14,6 +14,7 @@ import { ADMIN_EMAILS } from '@/lib/config';
 import RoleSwitcher from '@/components/RoleSwitcher';
 import TournamentNameInput from '@/components/TournamentNameInput';
 import { registerPlayerForTournament, type ITFTournamentSearchResult } from '@/lib/tournament-service';
+import { adjustManualPlayedAdjustment } from '@/lib/manual-played-adjustment';
 import type { Database } from '@/types/database';
 
 type Player = Database['public']['Tables']['player']['Row'];
@@ -207,11 +208,69 @@ export default function ManagerDashboard({
     return acc;
   }, {} as Record<string, Entry[]>);
 
-  // Calculate played tournaments for each player
-  const getPlayedCount = (playerId: string) => {
-    return entriesByPlayer[playerId]?.filter(
-      (e) => e.status === 'odehrano'
-    ).length || 0;
+  const getEntryPlayedCount = (playerId: string) =>
+    entriesByPlayer[playerId]?.filter((e) => e.status === 'odehrano').length || 0;
+
+  const getManualAdjustment = (playerId: string) =>
+    Math.max(0, players.find((p) => p.id === playerId)?.manual_played_adjustment ?? 0);
+
+  // Calculate played tournaments for each player (entry played + manual adjustment)
+  const getPlayedCount = (playerId: string) =>
+    getEntryPlayedCount(playerId) + getManualAdjustment(playerId);
+
+  const handleAdjustPlayedCount = async (playerId: string, delta: 1 | -1) => {
+    const currentManual = getManualAdjustment(playerId);
+    if (delta < 0 && currentManual <= 0) return;
+
+    try {
+      const nextValue = await adjustManualPlayedAdjustment(supabase, playerId, delta);
+      setPlayers((prev) =>
+        prev.map((p) =>
+          p.id === playerId ? { ...p, manual_played_adjustment: nextValue } : p
+        )
+      );
+    } catch (error) {
+      console.error('Error adjusting manual played count:', error);
+      alert('Nepodařilo se upravit historicky odehrané turnaje.');
+    }
+  };
+
+  const handleMarkAsPlayed = async (entryId: string) => {
+    try {
+      const { error } = await supabase
+        .from('entry')
+        .update({ status: 'odehrano' })
+        .eq('id', entryId);
+      if (error) {
+        alert('Chyba při označení odehráno: ' + error.message);
+        return;
+      }
+      setEntries((prev) =>
+        prev.map((e) => (e.id === entryId ? { ...e, status: 'odehrano' as const } : e))
+      );
+    } catch (error) {
+      console.error('Error marking as played:', error);
+      alert('Došlo k chybě');
+    }
+  };
+
+  const handleUnmarkAsPlayed = async (entryId: string) => {
+    try {
+      const { error } = await supabase
+        .from('entry')
+        .update({ status: 'planovano' })
+        .eq('id', entryId);
+      if (error) {
+        alert('Chyba při vrácení odehráno: ' + error.message);
+        return;
+      }
+      setEntries((prev) =>
+        prev.map((e) => (e.id === entryId ? { ...e, status: 'planovano' as const } : e))
+      );
+    } catch (error) {
+      console.error('Error unmarking played:', error);
+      alert('Došlo k chybě');
+    }
   };
 
   const handleLogout = async () => {
@@ -711,6 +770,26 @@ export default function ManagerDashboard({
                         getAgeFromBirthDate(player.birth_date)
                       )}
                     </div>
+                    <div className="mt-1 flex items-center justify-center gap-1 text-[10px] font-normal normal-case text-gray-500">
+                      <button
+                        type="button"
+                        onClick={() => handleAdjustPlayedCount(player.id, -1)}
+                        disabled={getManualAdjustment(player.id) <= 0}
+                        className="rounded border border-gray-300 px-1 py-0 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                        title="Odečíst historicky přidaný odehraný turnaj"
+                      >
+                        -
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAdjustPlayedCount(player.id, 1)}
+                        className="rounded border border-gray-300 px-1 py-0 hover:bg-gray-100"
+                        title="Přidat historicky odehraný turnaj"
+                      >
+                        +
+                      </button>
+                      <span>H: {getManualAdjustment(player.id)}</span>
+                    </div>
                   </th>
                 ))}
               </tr>
@@ -754,6 +833,31 @@ export default function ManagerDashboard({
                               <div className="text-xs font-semibold text-blue-900">
                                 P{entry.priority}
                               </div>
+                              {entry.status === 'odehrano' && (
+                                <div className="mt-1 text-xs text-green-700">Odehráno</div>
+                              )}
+                              {entry.status !== 'odhlasen' && (
+                                <div className="mt-1 flex justify-center gap-1">
+                                  {entry.status !== 'odehrano' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMarkAsPlayed(entry.id)}
+                                      className="rounded bg-green-100 px-1.5 py-0.5 text-[10px] text-green-700 hover:bg-green-200"
+                                    >
+                                      Odehráno
+                                    </button>
+                                  )}
+                                  {entry.status === 'odehrano' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUnmarkAsPlayed(entry.id)}
+                                      className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-800 hover:bg-amber-100"
+                                    >
+                                      Zrušit
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <span className="text-gray-300">-</span>

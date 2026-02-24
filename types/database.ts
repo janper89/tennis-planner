@@ -42,6 +42,7 @@ export interface Database {
           coach_id: string | null
           parent_id: string | null
           limit_turnaju: number
+          manual_played_adjustment: number
           created_at: string
           parent_connection_code: string | null
           parent_connection_code_expires_at: string | null
@@ -55,6 +56,7 @@ export interface Database {
           coach_id?: string | null
           parent_id?: string | null
           limit_turnaju?: number
+          manual_played_adjustment?: number
           created_at?: string
           parent_connection_code?: string | null
           parent_connection_code_expires_at?: string | null
@@ -68,6 +70,7 @@ export interface Database {
           coach_id?: string | null
           parent_id?: string | null
           limit_turnaju?: number
+          manual_played_adjustment?: number
           created_at?: string
           parent_connection_code?: string | null
           parent_connection_code_expires_at?: string | null

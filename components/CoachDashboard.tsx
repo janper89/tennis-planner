@@ -18,6 +18,7 @@ import {
   type RegisterTournamentParams,
   type ITFTournamentSearchResult,
 } from '@/lib/tournament-service';
+import { adjustManualPlayedAdjustment } from '@/lib/manual-played-adjustment';
 import TournamentNameInput from '@/components/TournamentNameInput';
 import TournamentFactsheetDetails from '@/components/TournamentFactsheetDetails';
 
@@ -117,11 +118,31 @@ export default function CoachDashboard({
     return acc;
   }, {} as Record<number, Entry[]>);
 
-  // Calculate played tournaments for each player
-  const getPlayedCount = (playerId: string) => {
-    return entriesByPlayer[playerId]?.filter(
-      (e) => e.status === 'odehrano'
-    ).length || 0;
+  const getEntryPlayedCount = (playerId: string) =>
+    entriesByPlayer[playerId]?.filter((e) => e.status === 'odehrano').length || 0;
+
+  const getManualAdjustment = (playerId: string) =>
+    Math.max(0, players.find((p) => p.id === playerId)?.manual_played_adjustment ?? 0);
+
+  // Calculate played tournaments for each player (entry played + manual adjustment)
+  const getPlayedCount = (playerId: string) =>
+    getEntryPlayedCount(playerId) + getManualAdjustment(playerId);
+
+  const handleAdjustPlayedCount = async (playerId: string, delta: 1 | -1) => {
+    const currentManual = getManualAdjustment(playerId);
+    if (delta < 0 && currentManual <= 0) return;
+
+    try {
+      const nextValue = await adjustManualPlayedAdjustment(supabase, playerId, delta);
+      setPlayers((prev) =>
+        prev.map((p) =>
+          p.id === playerId ? { ...p, manual_played_adjustment: nextValue } : p
+        )
+      );
+    } catch (error) {
+      console.error('Error adjusting manual played count:', error);
+      alert('Nepodařilo se upravit historicky odehrané turnaje.');
+    }
   };
 
   // Hybrid režim: po datu turnaje zobrazit "čeká na potvrzení", ale status neměnit automaticky.
@@ -490,6 +511,32 @@ export default function CoachDashboard({
     }
   };
 
+  const handleUnmarkAsPlayed = async (entryId: string) => {
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('entry')
+        .update({ status: 'planovano' })
+        .eq('id', entryId);
+
+      if (error) {
+        alert('Chyba při vrácení turnaje: ' + error.message);
+        return;
+      }
+
+      setEntries(
+        entries.map((e) =>
+          e.id === entryId ? { ...e, status: 'planovano' as const } : e
+        )
+      );
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Došlo k chybě');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleUpdateTournament = async (formData: FormData) => {
     if (!editingEntryForTournament) return;
 
@@ -532,6 +579,12 @@ export default function CoachDashboard({
 
   const playedCount = selectedPlayer
     ? getPlayedCount(selectedPlayer.id)
+    : 0;
+  const selectedPlayerEntryPlayedCount = selectedPlayer
+    ? getEntryPlayedCount(selectedPlayer.id)
+    : 0;
+  const selectedPlayerManualAdjustment = selectedPlayer
+    ? getManualAdjustment(selectedPlayer.id)
     : 0;
   const pendingCount = selectedPlayer
     ? getPendingConfirmationCount(selectedPlayer.id)
@@ -703,6 +756,30 @@ export default function CoachDashboard({
                 <p className="font-medium">
                   {playedCount} / {limit}
                 </p>
+                <div className="mt-1 flex items-center gap-2 text-xs text-gray-600">
+                  <button
+                    type="button"
+                    onClick={() => selectedPlayer && handleAdjustPlayedCount(selectedPlayer.id, -1)}
+                    disabled={!selectedPlayer || selectedPlayerManualAdjustment <= 0}
+                    className="rounded border border-gray-300 px-1.5 py-0.5 font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                    title="Odečíst historicky přidaný odehraný turnaj"
+                  >
+                    -
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => selectedPlayer && handleAdjustPlayedCount(selectedPlayer.id, 1)}
+                    disabled={!selectedPlayer}
+                    className="rounded border border-gray-300 px-1.5 py-0.5 font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                    title="Přidat historicky odehraný turnaj"
+                  >
+                    +
+                  </button>
+                  <span>
+                    Ze seznamu: {selectedPlayerEntryPlayedCount}, Historicky přidané:{' '}
+                    {selectedPlayerManualAdjustment}
+                  </span>
+                </div>
                 {pendingCount > 0 && (
                   <p className="text-xs text-amber-700">
                     Čeká na potvrzení: {pendingCount}
@@ -1215,6 +1292,15 @@ export default function CoachDashboard({
                                     {needsPlayedConfirmation(entry) ? 'Potvrdit odehráno' : 'Odehráno'}
                                   </button>
                                 )}
+                                {entry.status === 'odehrano' && (
+                                  <button
+                                    onClick={() => handleUnmarkAsPlayed(entry.id)}
+                                    disabled={loading}
+                                    className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                                  >
+                                    Zrušit odehráno
+                                  </button>
+                                )}
                                 {entry.status === 'odhlasen' ? (
                                   <button
                                     onClick={() => handleRestoreEntry(entry.id)}
@@ -1275,6 +1361,26 @@ export default function CoachDashboard({
                       getAgeFromBirthDate(player.birth_date)
                     )}
                   </p>
+                  <div className="mt-1 flex items-center gap-2 text-xs text-gray-600">
+                    <button
+                      type="button"
+                      onClick={() => handleAdjustPlayedCount(player.id, -1)}
+                      disabled={getManualAdjustment(player.id) <= 0}
+                      className="rounded border border-gray-300 px-1.5 py-0.5 font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      title="Odečíst historicky přidaný odehraný turnaj"
+                    >
+                      -
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAdjustPlayedCount(player.id, 1)}
+                      className="rounded border border-gray-300 px-1.5 py-0.5 font-medium text-gray-700 hover:bg-gray-100"
+                      title="Přidat historicky odehraný turnaj"
+                    >
+                      +
+                    </button>
+                    <span>Historicky přidané: {getManualAdjustment(player.id)}</span>
+                  </div>
                   <p className="text-sm text-gray-600">
                     Přihlášeno: {playerEntriesList.length}
                   </p>

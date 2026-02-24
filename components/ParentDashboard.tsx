@@ -19,6 +19,7 @@ import {
   type RegisterTournamentParams,
   type ITFTournamentSearchResult,
 } from '@/lib/tournament-service';
+import { adjustManualPlayedAdjustment } from '@/lib/manual-played-adjustment';
 import TournamentNameInput from '@/components/TournamentNameInput';
 import TournamentFactsheetDetails from '@/components/TournamentFactsheetDetails';
 
@@ -110,6 +111,34 @@ export default function ParentDashboard({
     acc[weekNum].push(entry);
     return acc;
   }, {} as Record<number, Entry[]>);
+
+  const getEntryPlayedCount = (playerId: string) =>
+    entriesByWeek
+      ? entries.filter((e) => e.player_id === playerId && e.status === 'odehrano').length
+      : 0;
+
+  const getManualAdjustment = (playerId: string) =>
+    Math.max(0, players.find((p) => p.id === playerId)?.manual_played_adjustment ?? 0);
+
+  const getEffectivePlayedCount = (playerId: string) =>
+    getEntryPlayedCount(playerId) + getManualAdjustment(playerId);
+
+  const handleAdjustPlayedCount = async (playerId: string, delta: 1 | -1) => {
+    const currentManual = getManualAdjustment(playerId);
+    if (delta < 0 && currentManual <= 0) return;
+
+    try {
+      const nextValue = await adjustManualPlayedAdjustment(supabase, playerId, delta);
+      setPlayers((prev) =>
+        prev.map((p) =>
+          p.id === playerId ? { ...p, manual_played_adjustment: nextValue } : p
+        )
+      );
+    } catch (error) {
+      console.error('Error adjusting manual played count:', error);
+      alert('Nepodařilo se upravit historicky odehrané turnaje.');
+    }
+  };
 
   const handleAddTournament = async (formData: FormData) => {
     setLoading(true);
@@ -592,9 +621,13 @@ export default function ParentDashboard({
   const playerEntries = entries.filter(
     (e) => e.player_id === selectedPlayer?.id
   );
-  const playedCount = playerEntries.filter(
-    (e) => e.status === 'odehrano'
-  ).length;
+  const playedCount = selectedPlayer ? getEffectivePlayedCount(selectedPlayer.id) : 0;
+  const selectedPlayerEntryPlayedCount = selectedPlayer
+    ? getEntryPlayedCount(selectedPlayer.id)
+    : 0;
+  const selectedPlayerManualAdjustment = selectedPlayer
+    ? getManualAdjustment(selectedPlayer.id)
+    : 0;
   const pendingCount = playerEntries.filter((e) => needsPlayedConfirmation(e)).length;
   const limit = selectedPlayer
     ? getMaxTournamentsForAge(getAgeFromBirthDate(selectedPlayer.birth_date))
@@ -869,6 +902,30 @@ export default function ParentDashboard({
                 <p className="font-medium">
                   {playedCount} / {limit}
                 </p>
+                <div className="mt-1 flex items-center gap-2 text-xs text-gray-600">
+                  <button
+                    type="button"
+                    onClick={() => selectedPlayer && handleAdjustPlayedCount(selectedPlayer.id, -1)}
+                    disabled={!selectedPlayer || selectedPlayerManualAdjustment <= 0}
+                    className="rounded border border-gray-300 px-1.5 py-0.5 font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                    title="Odečíst historicky přidaný odehraný turnaj"
+                  >
+                    -
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => selectedPlayer && handleAdjustPlayedCount(selectedPlayer.id, 1)}
+                    disabled={!selectedPlayer}
+                    className="rounded border border-gray-300 px-1.5 py-0.5 font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                    title="Přidat historicky odehraný turnaj"
+                  >
+                    +
+                  </button>
+                  <span>
+                    Ze seznamu: {selectedPlayerEntryPlayedCount}, Historicky přidané:{' '}
+                    {selectedPlayerManualAdjustment}
+                  </span>
+                </div>
                 {pendingCount > 0 && (
                   <p className="text-xs text-amber-700">
                     Čeká na potvrzení: {pendingCount}
