@@ -1384,6 +1384,21 @@ export default function CoachDashboard({
                   <p className="text-sm text-gray-600">
                     Přihlášeno: {playerEntriesList.length}
                   </p>
+                  <p className="mt-2 text-xs text-gray-600">
+                    Stav rodiče:{' '}
+                    <span
+                      className={
+                        player.parent_id ? 'font-medium text-green-700' : 'font-medium text-amber-700'
+                      }
+                    >
+                      {player.parent_id ? 'Připojen' : 'Nepřipojen'}
+                    </span>
+                  </p>
+                  {player.parent_id && (
+                    <p className="text-xs text-gray-500">
+                      Pro přepojení rodiče kontaktuj manažera.
+                    </p>
+                  )}
                   {!player.parent_id && (
                     <div className="mt-3 border-t border-gray-100 pt-3">
                       <button

@@ -87,8 +87,8 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'error', 'Hráč nenalezen');
   END IF;
 
-  -- 8 znaků alfanumerických (hex uppercase)
-  new_code := upper(encode(gen_random_bytes(4), 'hex'));
+  -- 8 znaků (hex uppercase) bez závislosti na pgcrypto
+  new_code := upper(substr(md5(random()::text || clock_timestamp()::text || p_player_id::text), 1, 8));
   expires_at := CASE WHEN p_expires_in_days > 0 THEN NOW() + (p_expires_in_days || ' days')::INTERVAL ELSE NULL END;
 
   UPDATE player
@@ -100,8 +100,45 @@ BEGIN
 END;
 $$;
 
+-- RPC: Manažer odpojí rodiče od hráče, aby bylo možné bezpečné přepojení
+CREATE OR REPLACE FUNCTION manager_unlink_parent_from_player(p_player_id UUID)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  app_user_id UUID;
+  user_role user_role;
+BEGIN
+  app_user_id := get_user_id();
+  IF app_user_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Uživatel není přihlášen');
+  END IF;
+
+  user_role := get_user_role();
+  IF user_role != 'manager' THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Pouze manažer může odpojit rodiče');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM player WHERE id = p_player_id) THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Hráč nenalezen');
+  END IF;
+
+  UPDATE player
+  SET parent_id = NULL,
+      parent_connection_code = NULL,
+      parent_connection_code_expires_at = NULL
+  WHERE id = p_player_id;
+
+  RETURN jsonb_build_object('success', true);
+END;
+$$;
+
 -- Grant execute pro authenticated
 GRANT EXECUTE ON FUNCTION connect_child_with_code(TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION connect_child_with_code(TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION generate_parent_connection_code(UUID, INT) TO authenticated;
 GRANT EXECUTE ON FUNCTION generate_parent_connection_code(UUID, INT) TO service_role;
+GRANT EXECUTE ON FUNCTION manager_unlink_parent_from_player(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION manager_unlink_parent_from_player(UUID) TO service_role;

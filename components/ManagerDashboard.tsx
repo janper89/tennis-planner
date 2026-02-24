@@ -56,6 +56,12 @@ export default function ManagerDashboard({
   const [showAddParentForm, setShowAddParentForm] = useState(false);
   const [newParentEmail, setNewParentEmail] = useState('');
   const [loadingParents, setLoadingParents] = useState(false);
+  const [generatedCodeForPlayer, setGeneratedCodeForPlayer] = useState<{
+    playerId: string;
+    code: string;
+  } | null>(null);
+  const [generateCodeLoadingPlayerId, setGenerateCodeLoadingPlayerId] = useState<string | null>(null);
+  const [unlinkParentLoadingPlayerId, setUnlinkParentLoadingPlayerId] = useState<string | null>(null);
   const [showAddTournamentForm, setShowAddTournamentForm] = useState(false);
   const [selectedPlayerForAdd, setSelectedPlayerForAdd] = useState<Player | null>(null);
   const [tournamentNameValue, setTournamentNameValue] = useState('');
@@ -172,6 +178,77 @@ export default function ManagerDashboard({
     } catch (error) {
       console.error('Error deleting parent:', error);
       alert('Došlo k chybě při mazání rodiče');
+    }
+  };
+
+  const handleGenerateParentCode = async (playerId: string) => {
+    setGenerateCodeLoadingPlayerId(playerId);
+    setGeneratedCodeForPlayer(null);
+    try {
+      const { data, error } = await supabase.rpc('generate_parent_connection_code', {
+        p_player_id: playerId,
+        p_expires_in_days: 7,
+      });
+      if (error) {
+        alert('Chyba: ' + error.message);
+        return;
+      }
+      const result = data as { success: boolean; code?: string; error?: string };
+      if (result.success && result.code) {
+        setGeneratedCodeForPlayer({ playerId, code: result.code });
+      } else {
+        alert(result.error ?? 'Nepodařilo se vygenerovat kód');
+      }
+    } finally {
+      setGenerateCodeLoadingPlayerId(null);
+    }
+  };
+
+  const handleUnlinkParent = async (player: Player) => {
+    if (
+      !confirm(
+        `Opravdu odpojit rodiče od hráče ${player.name}? Stávající propojení bude zrušeno.`
+      )
+    ) {
+      return;
+    }
+
+    setUnlinkParentLoadingPlayerId(player.id);
+    setGeneratedCodeForPlayer(null);
+    try {
+      const { data, error } = await supabase.rpc('manager_unlink_parent_from_player', {
+        p_player_id: player.id,
+      });
+
+      if (error) {
+        alert('Chyba při odpojování rodiče: ' + error.message);
+        return;
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        alert(result?.error ?? 'Nepodařilo se odpojit rodiče');
+        return;
+      }
+
+      setPlayers((prev) =>
+        prev.map((p) =>
+          p.id === player.id
+            ? {
+                ...p,
+                parent_id: null,
+                parent_connection_code: null,
+                parent_connection_code_expires_at: null,
+              }
+            : p
+        )
+      );
+
+      if (confirm('Rodič byl odpojen. Chceš hned vygenerovat nový kód pro přepojení?')) {
+        await handleGenerateParentCode(player.id);
+      }
+    } finally {
+      setUnlinkParentLoadingPlayerId(null);
     }
   };
 
@@ -651,6 +728,82 @@ export default function ManagerDashboard({
                 </option>
               ))}
             </select>
+          </div>
+        </div>
+
+        <div className="mb-6 rounded-lg bg-white p-6 shadow">
+          <h2 className="text-xl font-semibold text-gray-900">Propojení rodičů</h2>
+          <p className="mt-1 text-sm text-gray-600">
+            Přepojení hráče je možné jen přes manažera: odpojit rodiče, potom vygenerovat nový
+            kód.
+          </p>
+          <div className="mt-4 space-y-3">
+            {filteredPlayers.length === 0 && (
+              <p className="text-sm text-gray-500">Žádní hráči pro aktuální filtr.</p>
+            )}
+            {filteredPlayers.map((player) => {
+              const isLinked = !!player.parent_id;
+              const isGenerating = generateCodeLoadingPlayerId === player.id;
+              const isUnlinking = unlinkParentLoadingPlayerId === player.id;
+              const showGeneratedCode = generatedCodeForPlayer?.playerId === player.id;
+              return (
+                <div
+                  key={player.id}
+                  className="rounded-md border border-gray-200 p-3"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-gray-900">{player.name}</p>
+                      <p className="text-xs text-gray-600">
+                        Stav rodiče:{' '}
+                        <span
+                          className={isLinked ? 'font-medium text-green-700' : 'font-medium text-amber-700'}
+                        >
+                          {isLinked ? 'Připojen' : 'Nepřipojen'}
+                        </span>
+                      </p>
+                      {isLinked && (
+                        <p className="text-xs text-gray-500">
+                          Pro přepojení nejdřív odpoj rodiče.
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {isLinked && (
+                        <button
+                          type="button"
+                          onClick={() => handleUnlinkParent(player)}
+                          disabled={isUnlinking || isGenerating}
+                          className="rounded border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+                        >
+                          {isUnlinking ? 'Odpojuji…' : 'Odpojit rodiče'}
+                        </button>
+                      )}
+                      {!isLinked && (
+                        <button
+                          type="button"
+                          onClick={() => handleGenerateParentCode(player.id)}
+                          disabled={isGenerating || isUnlinking}
+                          className="rounded bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800 hover:bg-amber-200 disabled:opacity-50"
+                        >
+                          {isGenerating ? 'Generuji…' : 'Vygenerovat kód pro rodiče'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {showGeneratedCode && generatedCodeForPlayer && (
+                    <div className="mt-2 rounded bg-amber-50 p-2 text-sm">
+                      <p className="font-mono font-semibold text-amber-900">
+                        {generatedCodeForPlayer.code}
+                      </p>
+                      <p className="mt-1 text-xs text-amber-700">
+                        Předaj kód rodiči. Platnost 7 dní.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
