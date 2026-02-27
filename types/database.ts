@@ -13,21 +13,21 @@ export interface Database {
         Row: {
           id: string
           email: string
-          role: 'parent' | 'coach' | 'manager'
+          role: 'parent' | 'coach' | 'manager' | 'player'
           created_at: string
           name: string | null
         }
         Insert: {
           id?: string
           email: string
-          role?: 'parent' | 'coach' | 'manager'
+          role?: 'parent' | 'coach' | 'manager' | 'player'
           created_at?: string
           name?: string | null
         }
         Update: {
           id?: string
           email?: string
-          role?: 'parent' | 'coach' | 'manager'
+          role?: 'parent' | 'coach' | 'manager' | 'player'
           created_at?: string
           name?: string | null
         }
@@ -41,6 +41,7 @@ export interface Database {
           category: string | null
           coach_id: string | null
           parent_id: string | null
+          self_managed_by: string | null
           limit_turnaju: number
           manual_played_adjustment: number
           created_at: string
@@ -55,6 +56,7 @@ export interface Database {
           category?: string | null
           coach_id?: string | null
           parent_id?: string | null
+          self_managed_by?: string | null
           limit_turnaju?: number
           manual_played_adjustment?: number
           created_at?: string
@@ -69,6 +71,7 @@ export interface Database {
           category?: string | null
           coach_id?: string | null
           parent_id?: string | null
+          self_managed_by?: string | null
           limit_turnaju?: number
           manual_played_adjustment?: number
           created_at?: string

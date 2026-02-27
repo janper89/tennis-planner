@@ -3,16 +3,18 @@ export const ADMIN_EMAILS = [
   'perutka89@gmail.com',
 ];
 
-export type UserRole = 'parent' | 'coach' | 'manager';
+export type UserRole = 'parent' | 'coach' | 'manager' | 'player';
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   parent: 'Rodič',
   coach: 'Trenér',
   manager: 'Manažer',
+  player: 'Hráč',
 };
 
 export const ROLE_REDIRECTS: Record<UserRole, string> = {
   parent: '/parent',
   coach: '/coach',
   manager: '/manager',
+  player: '/player',
 };

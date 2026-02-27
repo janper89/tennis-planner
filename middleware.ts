@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-const PROTECTED_PREFIXES = ['/parent', '/coach', '/manager', '/password'];
+const PROTECTED_PREFIXES = ['/parent', '/coach', '/manager', '/player', '/password'];
 
 /** Cesty, které jsou dostupné i bez přihlášení (např. reset hesla). */
 const PUBLIC_PATHS = ['/password/reset'];

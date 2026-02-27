@@ -32,6 +32,11 @@ type Parent = {
   email: string;
   created_at: string;
 };
+type PlayerAccount = {
+  id: string;
+  email: string;
+  created_at: string;
+};
 
 interface ManagerDashboardProps {
   players: Player[];
@@ -56,6 +61,10 @@ export default function ManagerDashboard({
   const [showAddParentForm, setShowAddParentForm] = useState(false);
   const [newParentEmail, setNewParentEmail] = useState('');
   const [loadingParents, setLoadingParents] = useState(false);
+  const [playerAccounts, setPlayerAccounts] = useState<PlayerAccount[]>([]);
+  const [showAddPlayerAccountForm, setShowAddPlayerAccountForm] = useState(false);
+  const [newPlayerAccountEmail, setNewPlayerAccountEmail] = useState('');
+  const [loadingPlayerAccounts, setLoadingPlayerAccounts] = useState(false);
   const [generatedCodeForPlayer, setGeneratedCodeForPlayer] = useState<{
     playerId: string;
     code: string;
@@ -83,8 +92,9 @@ export default function ManagerDashboard({
         setIsAdmin(true);
       }
     });
-    // Load parents
+    // Load parents and player accounts
     loadParents();
+    loadPlayerAccounts();
   }, []);
 
   const loadParents = async () => {
@@ -103,6 +113,25 @@ export default function ManagerDashboard({
       setParents(data || []);
     } catch (error) {
       console.error('Error loading parents:', error);
+    }
+  };
+
+  const loadPlayerAccounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_user')
+        .select('id, email, created_at')
+        .eq('role', 'player')
+        .order('email');
+
+      if (error) {
+        console.error('Error loading player accounts:', error);
+        return;
+      }
+
+      setPlayerAccounts(data || []);
+    } catch (error) {
+      console.error('Error loading player accounts:', error);
     }
   };
 
@@ -156,6 +185,77 @@ export default function ManagerDashboard({
       alert('Došlo k chybě při přidávání rodiče');
     } finally {
       setLoadingParents(false);
+    }
+  };
+
+  const handleAddPlayerAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoadingPlayerAccounts(true);
+
+    try {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(newPlayerAccountEmail.trim())) {
+        alert('Zadej platnou emailovou adresu');
+        setLoadingPlayerAccounts(false);
+        return;
+      }
+
+      const { data: existing } = await supabase
+        .from('app_user')
+        .select('id')
+        .eq('email', newPlayerAccountEmail.trim())
+        .single();
+
+      if (existing) {
+        alert('Účet s tímto emailem již existuje');
+        setLoadingPlayerAccounts(false);
+        return;
+      }
+
+      const { error: insertError } = await supabase
+        .from('app_user')
+        .insert({
+          email: newPlayerAccountEmail.trim(),
+          role: 'player',
+        });
+
+      if (insertError) {
+        alert('Chyba při přidávání účtu hráče: ' + insertError.message);
+        setLoadingPlayerAccounts(false);
+        return;
+      }
+
+      setNewPlayerAccountEmail('');
+      setShowAddPlayerAccountForm(false);
+      await loadPlayerAccounts();
+      alert('Účet hráče byl vytvořen. Hráč se přihlásí tímto emailem a může si jednou vytvořit vlastní profil.');
+    } catch (error) {
+      console.error('Error adding player account:', error);
+      alert('Došlo k chybě při přidávání účtu hráče');
+    } finally {
+      setLoadingPlayerAccounts(false);
+    }
+  };
+
+  const handleDeletePlayerAccount = async (accountId: string, accountEmail: string) => {
+    if (!confirm(`Opravdu chceš smazat účet hráče ${accountEmail}?`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('app_user')
+        .delete()
+        .eq('id', accountId);
+
+      if (error) {
+        alert('Chyba při mazání účtu: ' + error.message);
+        return;
+      }
+
+      await loadPlayerAccounts();
+    } catch (error) {
+      console.error('Error deleting player account:', error);
     }
   };
 
@@ -613,6 +713,87 @@ export default function ManagerDashboard({
                     </div>
                     <button
                       onClick={() => handleDeleteParent(parent.id, parent.email)}
+                      className="rounded-md bg-red-100 px-3 py-1 text-sm text-red-700 hover:bg-red-200"
+                    >
+                      Smazat
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Player accounts (self-service role) */}
+        <div className="mb-6 rounded-lg bg-white p-6 shadow">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Účty hráčů (self-service)
+            </h2>
+            <button
+              onClick={() => {
+                setShowAddPlayerAccountForm(!showAddPlayerAccountForm);
+                setNewPlayerAccountEmail('');
+              }}
+              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              {showAddPlayerAccountForm ? 'Zrušit' : '+ Přidat hráče (účet)'}
+            </button>
+          </div>
+          <p className="mb-4 text-sm text-gray-600">
+            Účet s rolí hráč. Hráč se přihlásí emailem, jednou si vytvoří profil a pak si sám přidává turnaje.
+          </p>
+          {showAddPlayerAccountForm && (
+            <form onSubmit={handleAddPlayerAccount} className="mb-4 space-y-4">
+              <div>
+                <label
+                  htmlFor="player-account-email"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Email hráče
+                </label>
+                <input
+                  id="player-account-email"
+                  type="email"
+                  value={newPlayerAccountEmail}
+                  onChange={(e) => setNewPlayerAccountEmail(e.target.value)}
+                  required
+                  placeholder="hrac@email.cz"
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loadingPlayerAccounts}
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {loadingPlayerAccounts ? 'Přidávám...' : 'Přidat účet hráče'}
+              </button>
+            </form>
+          )}
+          <div className="mt-4">
+            <h3 className="mb-2 text-sm font-medium text-gray-700">
+              Seznam účtů hráčů ({playerAccounts.length})
+            </h3>
+            {playerAccounts.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                Zatím nejsou přidané žádné účty hráčů.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {playerAccounts.map((account) => (
+                  <div
+                    key={account.id}
+                    className="flex items-center justify-between rounded-md border border-gray-200 p-3"
+                  >
+                    <div>
+                      <p className="font-medium text-gray-900">{account.email}</p>
+                      <p className="text-xs text-gray-500">
+                        Přidáno: {new Date(account.created_at).toLocaleDateString('cs-CZ')}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleDeletePlayerAccount(account.id, account.email)}
                       className="rounded-md bg-red-100 px-3 py-1 text-sm text-red-700 hover:bg-red-200"
                     >
                       Smazat
