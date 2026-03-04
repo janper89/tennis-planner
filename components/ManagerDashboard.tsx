@@ -1115,18 +1115,18 @@ export default function ManagerDashboard({
           )}
         </div>
 
-        {/* Matrix View */}
-        <div className="overflow-x-auto rounded-lg bg-white shadow">
+        {/* Matrix View – scroll uvnitř kontejneru, aby sticky hlavička (jména sloupců) fungovala */}
+        <div className="max-h-[70vh] overflow-auto rounded-lg bg-white shadow">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="sticky left-0 z-10 bg-gray-50 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="sticky left-0 top-0 z-30 bg-gray-50 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                   Turnaj
                 </th>
                 {filteredPlayers.map((player) => (
                   <th
                     key={player.id}
-                    className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500"
+                    className="sticky top-0 z-20 bg-gray-50 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500"
                   >
                     <div className="font-semibold">{player.name}</div>
                     <div className="text-xs font-normal text-gray-400">
