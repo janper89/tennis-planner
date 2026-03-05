@@ -46,9 +46,9 @@ Bez argumentu se použije `data/tournament-cache.json`. Potřebné env: `NEXT_PU
 
 Skript provede **upsert** podle `tournament_key` – při opakovaném importu se záznamy aktualizují, nevznikají duplicity.
 
-### 3. Automatická aktualizace (3 měsíce dopředu, 1× měsíčně)
+### 3. Automatická aktualizace (4 měsíce dopředu, 1× měsíčně)
 
-Workflow **GitHub Actions** (`.github/workflows/update-tournament-cache.yml`) každý měsíc (1. v měsíci) stáhne turnaje z ITF Juniors na **3 měsíce dopředu** a naimportuje je do `tournament_cache`.
+Workflow **GitHub Actions** (`.github/workflows/update-tournament-cache.yml`) každý měsíc **1. v měsíci** stáhne turnaje z ITF Juniors na **4 měsíce dopředu** a naimportuje je do `tournament_cache`. V DB zůstane vždy jen okno „od teď + 4 měsíce“, starší turnaje z cache se odstraní.
 
 **Nastavení v repozitáři na GitHubu:**
 
@@ -57,7 +57,7 @@ Workflow **GitHub Actions** (`.github/workflows/update-tournament-cache.yml`) ka
    - `NEXT_PUBLIC_SUPABASE_URL` – URL projektu (Supabase → Project Settings → API)
    - `SUPABASE_SERVICE_ROLE_KEY` – service_role klíč (Supabase → Project Settings → API, pozor: ne anon key)
 
-Po pushnutí do `main` se workflow zapne. Spuštění: **Actions** → „Update tournament cache (3 months)“ → **Run workflow**. Naplánované spuštění je 1. v měsíci ve 3:00 UTC.
+Po pushnutí do `main` se workflow zapne. Ruční spuštění: **Actions** → „Update tournament cache (4 months)“ → **Run workflow**. Naplánované spuštění je **1. v měsíci ve 4:00 UTC** (5:00 / 6:00 SEČ podle letního času).
 
 ## Použití
 
