@@ -39,7 +39,24 @@ export async function middleware(request: NextRequest) {
 
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser();
+
+  // Handle expired or revoked refresh tokens – clear cookies and redirect to login
+  if (error) {
+    if (
+      error.code === 'refresh_token_not_found' ||
+      error.code === 'invalid_refresh_token'
+    ) {
+      const redirectResponse = NextResponse.redirect(new URL('/login', request.url));
+      request.cookies.getAll().forEach((cookie) => {
+        if (cookie.name.startsWith('sb-')) {
+          redirectResponse.cookies.delete(cookie.name);
+        }
+      });
+      return redirectResponse;
+    }
+  }
 
   if (isProtectedPath(request.nextUrl.pathname) && !user) {
     return NextResponse.redirect(new URL('/login', request.url));

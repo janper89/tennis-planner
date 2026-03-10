@@ -24,6 +24,7 @@ export default function ManagerPage() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userEmail, setUserEmail] = useState<string>('');
 
   useEffect(() => {
     async function loadData() {
@@ -38,6 +39,8 @@ export default function ManagerPage() {
           return;
         }
 
+        setUserEmail(user.email ?? '');
+
         // Get all players (exclude soft-deleted)
         const { data: playersData } = await supabase
           .from('player')
@@ -45,11 +48,11 @@ export default function ManagerPage() {
           .is('deleted_at', null)
           .order('name');
 
-        // Get all coaches
+        // Get all coaches (include managers so Albert Šprlák appears in dropdown)
         const { data: coachesData } = await supabase
           .from('app_user')
           .select('id, email')
-          .eq('role', 'coach');
+          .in('role', ['coach', 'manager']);
 
         const coachesList = (coachesData || []).map((c) => ({
           id: c.id,
@@ -115,6 +118,7 @@ export default function ManagerPage() {
       coaches={coaches}
       entries={entries}
       tournaments={tournaments}
+      userEmail={userEmail}
     />
   );
 }

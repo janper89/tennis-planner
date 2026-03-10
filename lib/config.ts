@@ -1,6 +1,12 @@
-// Admin emails – přidej sem svůj e-mail
+// Admin emails – přidej sem svůj e-mail (RoleSwitcher, atd.)
 export const ADMIN_EMAILS = [
   'perutka89@gmail.com',
+];
+
+/** Emaily, které mohou v režimu „Zobrazit jako“ plně editovat (přidávat dítě, turnaje, atd.) */
+export const ADMIN_EDIT_EMAILS = [
+  'perutka89@gmail.com',
+  'al.sprlak@seznam.cz',
 ];
 
 export type UserRole = 'parent' | 'coach' | 'manager' | 'player';

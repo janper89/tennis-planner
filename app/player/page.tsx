@@ -65,10 +65,11 @@ export default function PlayerPage() {
         setAppUserId(appUser.id);
         setUserName(appUser.name?.trim() || '');
 
+        // Include managers so Albert Šprlák appears in coach dropdown
         const { data: coachesData } = await supabase
           .from('app_user')
           .select('id, email')
-          .eq('role', 'coach')
+          .in('role', ['coach', 'manager'])
           .order('email');
 
         setCoaches(
@@ -142,12 +143,18 @@ export default function PlayerPage() {
     try {
       const name = (formData.get('name') as string)?.trim();
       const birth_date = formData.get('birth_date') as string;
-      const rocnik = parseInt(formData.get('rocnik') as string, 10);
+      const rocnikRaw = formData.get('rocnik') as string;
+      const rocnik = parseInt(rocnikRaw, 10);
       const category = (formData.get('category') as string)?.trim() || null;
       const coach_id = (formData.get('coach_id') as string) || null;
 
-      if (!name || !birth_date || !rocnik) {
+      if (!name || !birth_date || !rocnikRaw) {
         alert('Vyplň jméno, datum narození a ročník.');
+        setProfileLoading(false);
+        return;
+      }
+      if (Number.isNaN(rocnik) || rocnik < 2000 || rocnik > 2025) {
+        alert('Ročník musí být rok narození (2000–2025).');
         setProfileLoading(false);
         return;
       }
@@ -253,28 +260,30 @@ export default function PlayerPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">
-                  Ročník *
+                  Ročník (rok narození, 4 číslice) *
                 </label>
                 <input
                   type="number"
                   name="rocnik"
                   required
-                  min={1}
-                  max={20}
+                  min={2000}
+                  max={2025}
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                  placeholder="Např. 2010"
+                  placeholder="Např. 2011"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">
                   Kategorie
                 </label>
-                <input
-                  type="text"
+                <select
                   name="category"
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                  placeholder="Např. U12"
-                />
+                >
+                  <option value="">—</option>
+                  <option value="U16">U16</option>
+                  <option value="U18">U18</option>
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">

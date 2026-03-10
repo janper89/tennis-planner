@@ -57,11 +57,11 @@ export default function ParentPage() {
         const nameValue = appUser.name?.trim() || '';
         setUserName(nameValue);
 
-        // Get all coaches
+        // Get all coaches (include managers so Albert Šprlák appears in dropdown)
         const { data: coachesData } = await supabase
           .from('app_user')
           .select('id, email')
-          .eq('role', 'coach')
+          .in('role', ['coach', 'manager'])
           .order('email');
 
         const coachesList = (coachesData || []).map((c) => ({

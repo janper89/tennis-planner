@@ -10,9 +10,10 @@ import {
   getAgeFromBirthDate,
   getMaxTournamentsForAge,
 } from '@/lib/utils';
-import { ADMIN_EMAILS } from '@/lib/config';
+import { ADMIN_EMAILS, ADMIN_EDIT_EMAILS } from '@/lib/config';
 import RoleSwitcher from '@/components/RoleSwitcher';
 import TournamentNameInput from '@/components/TournamentNameInput';
+import ParentDashboard from '@/components/ParentDashboard';
 import { registerPlayerForTournament, type ITFTournamentSearchResult } from '@/lib/tournament-service';
 import { adjustManualPlayedAdjustment } from '@/lib/manual-played-adjustment';
 import type { Database } from '@/types/database';
@@ -30,6 +31,7 @@ type Coach = {
 type Parent = {
   id: string;
   email: string;
+  name: string | null;
   created_at: string;
 };
 type PlayerAccount = {
@@ -43,6 +45,7 @@ interface ManagerDashboardProps {
   coaches: Coach[];
   entries: Entry[];
   tournaments: Tournament[];
+  userEmail?: string;
 }
 
 export default function ManagerDashboard({
@@ -50,6 +53,7 @@ export default function ManagerDashboard({
   coaches,
   entries: initialEntries,
   tournaments: initialTournaments,
+  userEmail: managerEmail = '',
 }: ManagerDashboardProps) {
   const [players, setPlayers] = useState(initialPlayers);
   const [entries, setEntries] = useState(initialEntries);
@@ -86,6 +90,18 @@ export default function ManagerDashboard({
   const [addPlayerBirthDate, setAddPlayerBirthDate] = useState('');
   const [addPlayerCoachId, setAddPlayerCoachId] = useState<string>('');
   const [addPlayerLoading, setAddPlayerLoading] = useState(false);
+  const [viewingAsParentId, setViewingAsParentId] = useState<string | null>(null);
+  const [viewingAsParentData, setViewingAsParentData] = useState<{
+    players: Player[];
+    entries: Entry[];
+    tournaments: Tournament[];
+    parentEmail: string;
+    parentName: string;
+  } | null>(null);
+  const [loadingParentViewId, setLoadingParentViewId] = useState<string | null>(null);
+  const [editingParentId, setEditingParentId] = useState<string | null>(null);
+  const [editingParentName, setEditingParentName] = useState('');
+  const [editingParentLoading, setEditingParentLoading] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -104,7 +120,7 @@ export default function ManagerDashboard({
     try {
       const { data, error } = await supabase
         .from('app_user')
-        .select('id, email, created_at')
+        .select('id, email, name, created_at')
         .eq('role', 'parent')
         .order('email');
 
@@ -135,6 +151,83 @@ export default function ManagerDashboard({
       setPlayerAccounts(data || []);
     } catch (error) {
       console.error('Error loading player accounts:', error);
+    }
+  };
+
+  const loadParentViewData = async (parentId: string, parentEmail: string, parentName: string | null) => {
+    setLoadingParentViewId(parentId);
+    try {
+      const { data: playersData } = await supabase
+        .from('player')
+        .select('*')
+        .eq('parent_id', parentId)
+        .is('deleted_at', null)
+        .order('name');
+
+      const playerIds = playersData?.map((p) => p.id) || [];
+      const { data: entriesData } = await supabase
+        .from('entry')
+        .select(
+          `
+          *,
+          tournament:tournament_id (*),
+          player:player_id (*)
+        `
+        )
+        .in('player_id', playerIds.length > 0 ? playerIds : ['00000000-0000-0000-0000-000000000000'])
+        .is('deleted_at', null)
+        .order('tournament(datum)', { ascending: true });
+
+      const tournamentIds = entriesData?.map((e) => e.tournament_id) || [];
+      const { data: tournamentsData } = await supabase
+        .from('tournament')
+        .select('*')
+        .in('id', tournamentIds.length > 0 ? tournamentIds : ['00000000-0000-0000-0000-000000000000'])
+        .order('datum', { ascending: true });
+
+      setViewingAsParentData({
+        players: playersData || [],
+        entries: (entriesData as Entry[]) || [],
+        tournaments: tournamentsData || [],
+        parentEmail,
+        parentName: parentName?.trim() || parentEmail,
+      });
+      setViewingAsParentId(parentId);
+    } catch (error) {
+      console.error('Error loading parent view data:', error);
+      alert('Nepodařilo se načíst data rodiče');
+    } finally {
+      setLoadingParentViewId(null);
+    }
+  };
+
+  const openEditParentForm = (parent: Parent) => {
+    setEditingParentId(parent.id);
+    setEditingParentName(parent.name?.trim() || '');
+  };
+
+  const handleUpdateParentName = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingParentId) return;
+    const name = editingParentName.trim();
+    setEditingParentLoading(true);
+    try {
+      const { error } = await supabase
+        .from('app_user')
+        .update({ name: name || null })
+        .eq('id', editingParentId);
+
+      if (error) {
+        alert('Chyba při ukládání: ' + error.message);
+        return;
+      }
+      setEditingParentId(null);
+      loadParents();
+    } catch (err) {
+      console.error('Error updating parent:', err);
+      alert('Došlo k chybě');
+    } finally {
+      setEditingParentLoading(false);
     }
   };
 
@@ -556,8 +649,8 @@ export default function ManagerDashboard({
       return;
     }
     const rocnik = parseInt(rocnikStr, 10);
-    if (Number.isNaN(rocnik) || rocnik < 1 || rocnik > 20) {
-      alert('Ročník musí být číslo 1–20');
+    if (Number.isNaN(rocnik) || rocnik < 2000 || rocnik > 2025) {
+      alert('Ročník musí být rok narození (2000–2025)');
       setAddPlayerLoading(false);
       return;
     }
@@ -678,6 +771,46 @@ export default function ManagerDashboard({
     ...new Set(tournaments.map((t) => getWeekNumber(t.datum).toString())),
   ].sort();
 
+  // View as parent mode – show parent's dashboard with banner
+  if (viewingAsParentId && viewingAsParentData) {
+    const canEdit = ADMIN_EDIT_EMAILS.includes(managerEmail);
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div
+          className={canEdit ? 'border-b border-blue-200 bg-blue-100 px-4 py-3' : 'border-b border-amber-200 bg-amber-100 px-4 py-3'}
+        >
+          <div className="mx-auto max-w-7xl flex items-center justify-between">
+            <p className={`text-sm font-medium ${canEdit ? 'text-blue-900' : 'text-amber-900'}`}>
+              {canEdit
+                ? `Správa účtu: ${viewingAsParentData.parentName} — režim úprav`
+                : `Zobrazení jako ${viewingAsParentData.parentName} — pouze prohlížení`}
+            </p>
+            <button
+              onClick={() => {
+                setViewingAsParentId(null);
+                setViewingAsParentData(null);
+              }}
+              className={`rounded-md px-4 py-2 text-sm font-medium ${canEdit ? 'bg-blue-200 text-blue-900 hover:bg-blue-300' : 'bg-amber-200 text-amber-900 hover:bg-amber-300'}`}
+            >
+              Ukončit zobrazení
+            </button>
+          </div>
+        </div>
+        <ParentDashboard
+          players={viewingAsParentData.players}
+          entries={viewingAsParentData.entries}
+          tournaments={viewingAsParentData.tournaments}
+          coaches={coaches}
+          userEmail={viewingAsParentData.parentEmail}
+          userName={viewingAsParentData.parentName}
+          readOnly={!canEdit}
+          impersonatedParentId={canEdit ? viewingAsParentId : undefined}
+          hideSessionActions
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow">
@@ -775,18 +908,78 @@ export default function ManagerDashboard({
                         Přidáno: {new Date(parent.created_at).toLocaleDateString('cs-CZ')}
                       </p>
                     </div>
-                    <button
-                      onClick={() => handleDeleteParent(parent.id, parent.email)}
-                      className="rounded-md bg-red-100 px-3 py-1 text-sm text-red-700 hover:bg-red-200"
-                    >
-                      Smazat
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => loadParentViewData(parent.id, parent.email, parent.name)}
+                        disabled={loadingParentViewId !== null}
+                        className="rounded-md bg-blue-100 px-3 py-1 text-sm text-blue-700 hover:bg-blue-200 disabled:opacity-50"
+                      >
+                        {loadingParentViewId === parent.id ? 'Načítám...' : 'Zobrazit jako'}
+                      </button>
+                      <button
+                        onClick={() => openEditParentForm(parent)}
+                        className="rounded-md bg-gray-100 px-3 py-1 text-sm text-gray-700 hover:bg-gray-200"
+                      >
+                        Upravit profil
+                      </button>
+                      <button
+                        onClick={() => handleDeleteParent(parent.id, parent.email)}
+                        className="rounded-md bg-red-100 px-3 py-1 text-sm text-red-700 hover:bg-red-200"
+                      >
+                        Smazat
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
         </div>
+
+        {/* Edit Parent Profile Modal */}
+        {editingParentId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="mx-4 w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+              <h3 className="mb-4 text-lg font-semibold text-gray-900">
+                Upravit profil rodiče
+              </h3>
+              <form onSubmit={handleUpdateParentName} className="space-y-4">
+                <div>
+                  <label
+                    htmlFor="edit-parent-name"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Jméno
+                  </label>
+                  <input
+                    id="edit-parent-name"
+                    type="text"
+                    value={editingParentName}
+                    onChange={(e) => setEditingParentName(e.target.value)}
+                    placeholder="Jméno rodiče"
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingParentId(null)}
+                    className="rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                  >
+                    Zrušit
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={editingParentLoading}
+                    className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {editingParentLoading ? 'Ukládám...' : 'Uložit'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Player accounts (self-service role) */}
         <div className="mb-6 rounded-lg bg-white p-6 shadow">
@@ -914,25 +1107,27 @@ export default function ManagerDashboard({
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Ročník *</label>
+                <label className="block text-sm font-medium text-gray-700">Ročník (rok narození, 4 číslice) *</label>
                 <input
                   type="number"
                   name="player_rocnik"
                   required
-                  min={1}
-                  max={20}
+                  min={2000}
+                  max={2025}
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                  placeholder="Např. 2010"
+                  placeholder="Např. 2011"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Kategorie</label>
-                <input
-                  type="text"
+                <select
                   name="player_category"
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                  placeholder="Např. U12"
-                />
+                >
+                  <option value="">—</option>
+                  <option value="U16">U16</option>
+                  <option value="U18">U18</option>
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Trenér (volitelné)</label>

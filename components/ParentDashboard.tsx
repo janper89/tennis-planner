@@ -41,6 +41,12 @@ interface ParentDashboardProps {
   coaches: Coach[];
   userEmail: string;
   userName: string;
+  /** When true, hide edit/add actions (manager viewing as parent) */
+  readOnly?: boolean;
+  /** When set, mutations use this parent_id (admin editing on behalf of parent) */
+  impersonatedParentId?: string;
+  /** When true, hide logout/password (manager viewing – those would affect manager's session) */
+  hideSessionActions?: boolean;
 }
 
 export default function ParentDashboard({
@@ -50,6 +56,9 @@ export default function ParentDashboard({
   coaches,
   userEmail,
   userName,
+  readOnly = false,
+  impersonatedParentId,
+  hideSessionActions = false,
 }: ParentDashboardProps) {
   const [players, setPlayers] = useState(initialPlayers);
   const [entries, setEntries] = useState(initialEntries);
@@ -464,13 +473,19 @@ export default function ParentDashboard({
     try {
       const name = formData.get('name') as string;
       const birthDate = formData.get('birth_date') as string;
-      const rocnik = parseInt(formData.get('rocnik') as string);
+      const rocnikRaw = formData.get('rocnik') as string;
+      const rocnik = parseInt(rocnikRaw, 10);
       const category = formData.get('category') as string;
       const coachId = formData.get('coach_id') as string;
 
       // Validate required fields
-      if (!name || !birthDate || !rocnik || !coachId) {
+      if (!name || !birthDate || !rocnikRaw || !coachId) {
         alert('Vyplň všechna povinná pole');
+        setLoading(false);
+        return;
+      }
+      if (Number.isNaN(rocnik) || rocnik < 2000 || rocnik > 2025) {
+        alert('Ročník musí být rok narození (2000–2025)');
         setLoading(false);
         return;
       }
@@ -483,33 +498,48 @@ export default function ParentDashboard({
         return;
       }
 
-      // Get current user
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const parentId = impersonatedParentId;
+      if (!parentId) {
+        // Normal parent flow – get current user's app_user id
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data: appUser } = await supabase
+          .from('app_user')
+          .select('id')
+          .eq('email', user.email!)
+          .single();
+        if (!appUser) return;
+        // Use appUser.id for parent_id
+        const { error: playerError } = await supabase.from('player').insert({
+          name: name.trim(),
+          birth_date: birthDate,
+          rocnik,
+          category: category.trim() || null,
+          parent_id: appUser.id,
+          coach_id: coachId,
+          limit_turnaju: getMaxTournamentsForAge(getAgeFromBirthDate(birthDate)),
+        });
+        if (playerError) {
+          alert('Chyba při přidávání dítěte: ' + playerError.message);
+          return;
+        }
+        window.location.reload();
+        return;
+      }
 
-      if (!user) return;
-
-      // Get app_user id
-      const { data: appUser } = await supabase
-        .from('app_user')
-        .select('id')
-        .eq('email', user.email!)
-        .single();
-
-      if (!appUser) return;
-
+      // Admin editing on behalf of parent – use impersonatedParentId
       const limitTurnaju = getMaxTournamentsForAge(
         getAgeFromBirthDate(birthDate)
       );
 
-      // Create player
       const { error: playerError } = await supabase.from('player').insert({
         name: name.trim(),
         birth_date: birthDate,
         rocnik,
         category: category.trim() || null,
-        parent_id: appUser.id,
+        parent_id: parentId,
         coach_id: coachId,
         limit_turnaju: limitTurnaju,
       });
@@ -541,9 +571,13 @@ export default function ParentDashboard({
     }
     setConnectionLoading(true);
     try {
-      const { data, error } = await supabase.rpc('connect_child_with_code', {
-        code_input: code,
-      });
+      const rpcName = impersonatedParentId
+        ? 'manager_connect_child_with_code_for_parent'
+        : 'connect_child_with_code';
+      const rpcParams = impersonatedParentId
+        ? { code_input: code, p_parent_id: impersonatedParentId }
+        : { code_input: code };
+      const { data, error } = await supabase.rpc(rpcName, rpcParams);
       if (error) {
         setConnectionError(error.message);
         return;
@@ -593,20 +627,32 @@ export default function ParentDashboard({
 
     setLoading(true);
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      if (impersonatedParentId) {
+        // Admin updating parent's name on their behalf
+        const { error } = await supabase
+          .from('app_user')
+          .update({ name: newName.trim() })
+          .eq('id', impersonatedParentId);
 
-      if (!user) return;
+        if (error) {
+          alert('Chyba při aktualizaci jména: ' + error.message);
+          return;
+        }
+      } else {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return;
 
-      const { error } = await supabase
-        .from('app_user')
-        .update({ name: newName.trim() })
-        .eq('email', user.email!);
+        const { error } = await supabase
+          .from('app_user')
+          .update({ name: newName.trim() })
+          .eq('email', user.email!);
 
-      if (error) {
-        alert('Chyba při aktualizaci jména: ' + error.message);
-        return;
+        if (error) {
+          alert('Chyba při aktualizaci jména: ' + error.message);
+          return;
+        }
       }
 
       setEditingName(false);
@@ -644,7 +690,11 @@ export default function ParentDashboard({
               <h1 className="text-2xl font-bold text-gray-900">
                 Tenisový klub - Rodič
               </h1>
-              {editingName ? (
+              {readOnly ? (
+                <p className="mt-1 text-sm text-gray-700">
+                  {userName?.trim() || userEmail}
+                </p>
+              ) : editingName ? (
                 <div className="mt-1 flex items-center gap-2">
                   <input
                     type="text"
@@ -703,26 +753,29 @@ export default function ParentDashboard({
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-3">
-              <Link
-                href="/password"
-                className="rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
-              >
-                Změnit heslo
-              </Link>
-              <button
-                onClick={handleLogout}
-                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-              >
-                Odhlásit se
-              </button>
-            </div>
+            {!readOnly && !hideSessionActions && (
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/password"
+                  className="rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+                >
+                  Změnit heslo
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                >
+                  Odhlásit se
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Connect child with code */}
+        {!readOnly && (
         <div className="mb-6 rounded-lg bg-white p-6 shadow">
           <h3 className="mb-2 text-lg font-semibold">Připojit dítě pomocí kódu</h3>
           <p className="mb-4 text-sm text-gray-600">
@@ -758,6 +811,7 @@ export default function ParentDashboard({
             <p className="mt-2 text-sm text-green-600">{connectionSuccess}</p>
           )}
         </div>
+        )}
 
         {/* Empty State - No Children */}
         {(!players || players.length === 0) && (
@@ -766,19 +820,23 @@ export default function ParentDashboard({
               Zatím nemáš přidané žádné dítě
             </h2>
             <p className="mb-6 text-gray-600">
-              Přidej své první dítě, abys mohl začít plánovat turnaje.
+              {readOnly
+                ? 'Tento rodič zatím nemá přidané žádné dítě.'
+                : 'Přidej své první dítě, abys mohl začít plánovat turnaje.'}
             </p>
-            <button
-              onClick={() => setShowAddChildForm(true)}
-              className="rounded-md bg-blue-600 px-6 py-3 text-sm font-medium text-white hover:bg-blue-700"
-            >
-              Přidat první dítě
-            </button>
+            {!readOnly && (
+              <button
+                onClick={() => setShowAddChildForm(true)}
+                className="rounded-md bg-blue-600 px-6 py-3 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                Přidat první dítě
+              </button>
+            )}
           </div>
         )}
 
         {/* Add Child Form */}
-        {showAddChildForm && (
+        {showAddChildForm && !readOnly && (
           <div className="mb-6 rounded-lg bg-white p-6 shadow">
             <h3 className="mb-4 text-lg font-semibold">Přidat dítě</h3>
             <form action={handleAddChild} className="space-y-4">
@@ -818,28 +876,30 @@ export default function ParentDashboard({
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">
-                  Ročník *
+                  Ročník (rok narození, 4 číslice) *
                 </label>
                 <input
                   type="number"
                   name="rocnik"
                   required
-                  min="1"
-                  max="20"
+                  min={2000}
+                  max={2025}
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                  placeholder="Např. 2010"
+                  placeholder="Např. 2011"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">
                   Kategorie
                 </label>
-                <input
-                  type="text"
+                <select
                   name="category"
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                  placeholder="Např. U12"
-                />
+                >
+                  <option value="">—</option>
+                  <option value="U16">U16</option>
+                  <option value="U18">U18</option>
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">
@@ -905,24 +965,28 @@ export default function ParentDashboard({
                   {playedCount} / {limit}
                 </p>
                 <div className="mt-1 flex items-center gap-2 text-xs text-gray-600">
-                  <button
-                    type="button"
-                    onClick={() => selectedPlayer && handleAdjustPlayedCount(selectedPlayer.id, -1)}
-                    disabled={!selectedPlayer || selectedPlayerManualAdjustment <= 0}
-                    className="rounded border border-gray-300 px-1.5 py-0.5 font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
-                    title="Odečíst historicky přidaný odehraný turnaj"
-                  >
-                    -
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => selectedPlayer && handleAdjustPlayedCount(selectedPlayer.id, 1)}
-                    disabled={!selectedPlayer}
-                    className="rounded border border-gray-300 px-1.5 py-0.5 font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
-                    title="Přidat historicky odehraný turnaj"
-                  >
-                    +
-                  </button>
+                  {!readOnly && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => selectedPlayer && handleAdjustPlayedCount(selectedPlayer.id, -1)}
+                        disabled={!selectedPlayer || selectedPlayerManualAdjustment <= 0}
+                        className="rounded border border-gray-300 px-1.5 py-0.5 font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                        title="Odečíst historicky přidaný odehraný turnaj"
+                      >
+                        -
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => selectedPlayer && handleAdjustPlayedCount(selectedPlayer.id, 1)}
+                        disabled={!selectedPlayer}
+                        className="rounded border border-gray-300 px-1.5 py-0.5 font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                        title="Přidat historicky odehraný turnaj"
+                      >
+                        +
+                      </button>
+                    </>
+                  )}
                   <span>
                     Ze seznamu: {selectedPlayerEntryPlayedCount}, Historicky přidané:{' '}
                     {selectedPlayerManualAdjustment}
@@ -962,7 +1026,7 @@ export default function ParentDashboard({
         )}
 
         {/* Add Child Button */}
-        {players.length > 0 && (
+        {players.length > 0 && !readOnly && (
           <div className="mb-6">
             <button
               onClick={() => setShowAddChildForm(true)}
@@ -974,7 +1038,7 @@ export default function ParentDashboard({
         )}
 
         {/* Add Tournament Button */}
-        {selectedPlayer && (
+        {selectedPlayer && !readOnly && (
           <div className="mb-6">
             <button
               onClick={() => {
@@ -989,7 +1053,7 @@ export default function ParentDashboard({
         )}
 
         {/* Tournament Form */}
-        {(showForm || editingEntry) && selectedPlayer && (
+        {(showForm || editingEntry) && selectedPlayer && !readOnly && (
           <div className="mb-6 rounded-lg bg-white p-6 shadow">
             <h3 className="mb-4 text-lg font-semibold">
               {editingEntry ? 'Upravit turnaj' : 'Nový turnaj'}
@@ -1352,6 +1416,7 @@ export default function ParentDashboard({
                                 </div>
                               )}
                             </div>
+                            {!readOnly && (
                             <div className="ml-4 flex flex-wrap gap-2">
                               {entry.status !== 'odehrano' && entry.status !== 'odhlasen' && (
                                 <button
@@ -1397,6 +1462,7 @@ export default function ParentDashboard({
                                 Smazat
                               </button>
                             </div>
+                            )}
                           </div>
                         </div>
                       ))}
