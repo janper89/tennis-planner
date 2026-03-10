@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import {
   formatDate,
   formatTournamentName,
+  formatCategory,
   getWeekNumber,
   getWeekRange,
   getAgeFromBirthDate,
@@ -173,7 +174,8 @@ export default function CoachDashboard({
       const birthDate = formData.get('birth_date') as string;
       const rocnikRaw = formData.get('rocnik') as string;
       const rocnik = parseInt(rocnikRaw, 10);
-      const category = formData.get('category') as string;
+      const categoryValues = formData.getAll('category') as string[];
+      const category = categoryValues.length > 0 ? categoryValues : null;
 
       // Validate required fields
       if (!name || !birthDate || !rocnikRaw) {
@@ -211,6 +213,22 @@ export default function CoachDashboard({
 
       if (!appUser) return;
 
+      const { data: existing } = await supabase
+        .from('player')
+        .select('id, name')
+        .eq('name', name.trim())
+        .eq('birth_date', birthDate)
+        .is('deleted_at', null);
+      if (existing?.length) {
+        const proceed = confirm(
+          `Hráč se stejným jménem a datem narození už existuje (${existing[0].name}). Chcete přesto přidat nového hráče?`
+        );
+        if (!proceed) {
+          setLoading(false);
+          return;
+        }
+      }
+
       const limitTurnaju = getMaxTournamentsForAge(
         getAgeFromBirthDate(birthDate)
       );
@@ -220,7 +238,7 @@ export default function CoachDashboard({
         name: name.trim(),
         birth_date: birthDate,
         rocnik,
-        category: category.trim() || null,
+        category: category,
         coach_id: appUser.id,
         parent_id: null,
         limit_turnaju: limitTurnaju,
@@ -712,14 +730,16 @@ export default function CoachDashboard({
                 <label className="block text-sm font-medium text-gray-700">
                   Kategorie
                 </label>
-                <select
-                  name="category"
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                >
-                  <option value="">—</option>
-                  <option value="U16">U16</option>
-                  <option value="U18">U18</option>
-                </select>
+                <div className="mt-2 flex flex-wrap gap-4">
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" name="category" value="U16" className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                    <span className="text-sm text-gray-700">U16</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" name="category" value="U18" className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                    <span className="text-sm text-gray-700">U18</span>
+                  </label>
+                </div>
               </div>
               <div className="flex gap-2">
                 <button
@@ -760,7 +780,7 @@ export default function CoachDashboard({
               </div>
               <div>
                 <p className="text-sm text-gray-600">Kategorie</p>
-                <p className="font-medium">{selectedPlayer.category || '-'}</p>
+                <p className="font-medium">{formatCategory(selectedPlayer.category)}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Odehrané turnaje</p>
@@ -1364,7 +1384,7 @@ export default function CoachDashboard({
                 >
                   <h3 className="font-semibold">{player.name}</h3>
                   <p className="text-sm text-gray-600">
-                    Ročník: {player.rocnik} • Kategorie: {player.category || '-'}
+                    Ročník: {player.rocnik} • Kategorie: {formatCategory(player.category)}
                   </p>
                   <p className="mt-2 text-sm">
                     Turnaje: {playerPlayedCount} /{' '}

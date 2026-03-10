@@ -45,6 +45,13 @@ export function getAgeFromBirthDate(
   return Math.max(0, refYear - birthYear);
 }
 
+/** Format category for display – supports both string[] (new) and string (legacy) */
+export function formatCategory(cat: string[] | string | null | undefined): string {
+  if (cat == null) return '-';
+  if (Array.isArray(cat)) return cat.length ? cat.join(', ') : '-';
+  return typeof cat === 'string' && cat.trim() ? cat.trim() : '-';
+}
+
 /** Normalize tournament name – removes duplication e.g. "J100 LOUGHBOROUGHJ100 LOUGHBOROUGH (GBR)" → "J100 LOUGHBOROUGH (GBR)" */
 export function formatTournamentName(name: string | null | undefined): string {
   if (!name || typeof name !== 'string') return name || '';

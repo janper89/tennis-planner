@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import {
   formatDate,
   formatTournamentName,
+  formatCategory,
   getWeekNumber,
   getWeekRange,
   getAgeFromBirthDate,
@@ -519,7 +520,7 @@ export default function PlayerDashboard({
             </div>
             <div>
               <p className="text-sm text-gray-600">Kategorie</p>
-              <p className="font-medium">{player.category || '-'}</p>
+              <p className="font-medium">{formatCategory(player.category)}</p>
             </div>
             <div>
               <p className="text-sm text-gray-600">Odehrané turnaje</p>

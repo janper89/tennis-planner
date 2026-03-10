@@ -38,7 +38,7 @@ export interface Database {
           name: string
           birth_date: string
           rocnik: number
-          category: string | null
+          category: string[] | null
           coach_id: string | null
           parent_id: string | null
           self_managed_by: string | null
@@ -54,7 +54,7 @@ export interface Database {
           name: string
           birth_date: string
           rocnik: number
-          category?: string | null
+          category?: string[] | null
           coach_id?: string | null
           parent_id?: string | null
           self_managed_by?: string | null
@@ -69,7 +69,7 @@ export interface Database {
           name?: string
           birth_date?: string
           rocnik?: number
-          category?: string | null
+          category?: string[] | null
           coach_id?: string | null
           parent_id?: string | null
           self_managed_by?: string | null

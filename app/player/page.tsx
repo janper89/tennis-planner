@@ -145,7 +145,8 @@ export default function PlayerPage() {
       const birth_date = formData.get('birth_date') as string;
       const rocnikRaw = formData.get('rocnik') as string;
       const rocnik = parseInt(rocnikRaw, 10);
-      const category = (formData.get('category') as string)?.trim() || null;
+      const categoryValues = formData.getAll('category') as string[];
+      const category = categoryValues.length > 0 ? categoryValues : null;
       const coach_id = (formData.get('coach_id') as string) || null;
 
       if (!name || !birth_date || !rocnikRaw) {
@@ -164,6 +165,22 @@ export default function PlayerPage() {
         alert('Datum narození nemůže být v budoucnosti.');
         setProfileLoading(false);
         return;
+      }
+
+      const { data: existing } = await createClient()
+        .from('player')
+        .select('id, name')
+        .eq('name', name)
+        .eq('birth_date', birth_date)
+        .is('deleted_at', null);
+      if (existing?.length) {
+        const proceed = confirm(
+          `Hráč se stejným jménem a datem narození už existuje (${existing[0].name}). Chcete přesto přidat nového hráče?`
+        );
+        if (!proceed) {
+          setProfileLoading(false);
+          return;
+        }
       }
 
       const limit_turnaju = getMaxTournamentsForAge(
@@ -276,14 +293,16 @@ export default function PlayerPage() {
                 <label className="block text-sm font-medium text-gray-700">
                   Kategorie
                 </label>
-                <select
-                  name="category"
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                >
-                  <option value="">—</option>
-                  <option value="U16">U16</option>
-                  <option value="U18">U18</option>
-                </select>
+                <div className="mt-2 flex flex-wrap gap-4">
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" name="category" value="U16" className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                    <span className="text-sm text-gray-700">U16</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" name="category" value="U18" className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                    <span className="text-sm text-gray-700">U18</span>
+                  </label>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">
