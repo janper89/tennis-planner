@@ -303,7 +303,7 @@ export default function PlayerDashboard({
     try {
       const { error: entryError } = await supabase
         .from('entry')
-        .delete()
+        .update({ deleted_at: new Date().toISOString() })
         .eq('id', entryId);
       if (entryError) {
         alert('Chyba při mazání: ' + entryError.message);
@@ -313,6 +313,7 @@ export default function PlayerDashboard({
         .from('entry')
         .select('id')
         .eq('tournament_id', tournamentId)
+        .is('deleted_at', null)
         .limit(1);
       if (!otherEntries || otherEntries.length === 0) {
         await supabase.from('tournament').delete().eq('id', tournamentId);

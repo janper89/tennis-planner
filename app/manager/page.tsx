@@ -38,10 +38,11 @@ export default function ManagerPage() {
           return;
         }
 
-        // Get all players
+        // Get all players (exclude soft-deleted)
         const { data: playersData } = await supabase
           .from('player')
           .select('*')
+          .is('deleted_at', null)
           .order('name');
 
         // Get all coaches
@@ -55,7 +56,7 @@ export default function ManagerPage() {
           email: c.email,
         }));
 
-        // Get all entries
+        // Get all entries (exclude soft-deleted)
         const { data: entriesData } = await supabase
           .from('entry')
           .select(
@@ -65,6 +66,7 @@ export default function ManagerPage() {
             player:player_id (*)
           `
           )
+          .is('deleted_at', null)
           .order('tournament(datum)', { ascending: true });
 
         // Get all tournaments

@@ -414,7 +414,10 @@ export default function CoachDashboard({
 
     setLoading(true);
     try {
-      const { error } = await supabase.from('entry').delete().eq('id', entryId);
+      const { error } = await supabase
+        .from('entry')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', entryId);
 
       if (error) {
         alert('Chyba při mazání přihlášky: ' + error.message);

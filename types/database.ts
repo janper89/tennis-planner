@@ -47,6 +47,7 @@ export interface Database {
           created_at: string
           parent_connection_code: string | null
           parent_connection_code_expires_at: string | null
+          deleted_at: string | null
         }
         Insert: {
           id?: string
@@ -194,6 +195,7 @@ export interface Database {
           status: 'planovano' | 'prihlasen' | 'odhlasen' | 'odehrano'
           poznamka_rodic: string | null
           created_at: string
+          deleted_at: string | null
         }
         Insert: {
           id?: string

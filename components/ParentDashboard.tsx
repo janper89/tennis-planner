@@ -372,10 +372,10 @@ export default function ParentDashboard({
 
     setLoading(true);
     try {
-      // Delete entry
+      // Soft delete entry
       const { error: entryError } = await supabase
         .from('entry')
-        .delete()
+        .update({ deleted_at: new Date().toISOString() })
         .eq('id', entryId);
 
       if (entryError) {
@@ -383,11 +383,12 @@ export default function ParentDashboard({
         return;
       }
 
-      // Check if tournament has other entries
+      // Check if tournament has other non-deleted entries
       const { data: otherEntries } = await supabase
         .from('entry')
         .select('id')
         .eq('tournament_id', tournamentId)
+        .is('deleted_at', null)
         .limit(1);
 
       // If no other entries, delete tournament

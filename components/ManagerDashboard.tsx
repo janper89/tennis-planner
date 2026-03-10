@@ -72,6 +72,9 @@ export default function ManagerDashboard({
   const [generateCodeLoadingPlayerId, setGenerateCodeLoadingPlayerId] = useState<string | null>(null);
   const [unlinkParentLoadingPlayerId, setUnlinkParentLoadingPlayerId] = useState<string | null>(null);
   const [deletePlayerLoadingId, setDeletePlayerLoadingId] = useState<string | null>(null);
+  const [showDeletedPlayers, setShowDeletedPlayers] = useState(false);
+  const [deletedPlayers, setDeletedPlayers] = useState<Player[]>([]);
+  const [restorePlayerLoadingId, setRestorePlayerLoadingId] = useState<string | null>(null);
   const [showAddTournamentForm, setShowAddTournamentForm] = useState(false);
   const [selectedPlayerForAdd, setSelectedPlayerForAdd] = useState<Player | null>(null);
   const [tournamentNameValue, setTournamentNameValue] = useState('');
@@ -353,6 +356,33 @@ export default function ManagerDashboard({
     }
   };
 
+  const handleRestorePlayer = async (player: Player) => {
+    setRestorePlayerLoadingId(player.id);
+    try {
+      const { error: entryError } = await supabase
+        .from('entry')
+        .update({ deleted_at: null })
+        .eq('player_id', player.id);
+      if (entryError) {
+        alert('Chyba při obnovování přihlášek: ' + entryError.message);
+        return;
+      }
+      const { error } = await supabase
+        .from('player')
+        .update({ deleted_at: null })
+        .eq('id', player.id);
+      if (error) {
+        alert('Chyba při obnovování hráče: ' + error.message);
+        return;
+      }
+      setDeletedPlayers((prev) => prev.filter((p) => p.id !== player.id));
+      setPlayers((prev) => [...prev, { ...player, deleted_at: null }]);
+      window.location.reload();
+    } finally {
+      setRestorePlayerLoadingId(null);
+    }
+  };
+
   const handleDeletePlayer = async (player: Player) => {
     const entryCount = entriesByPlayer[player.id]?.length ?? 0;
     const msg =
@@ -362,7 +392,19 @@ export default function ManagerDashboard({
     if (!confirm(msg)) return;
     setDeletePlayerLoadingId(player.id);
     try {
-      const { error } = await supabase.from('player').delete().eq('id', player.id);
+      const now = new Date().toISOString();
+      const { error: entryError } = await supabase
+        .from('entry')
+        .update({ deleted_at: now })
+        .eq('player_id', player.id);
+      if (entryError) {
+        alert('Chyba při mazání přihlášek: ' + entryError.message);
+        return;
+      }
+      const { error } = await supabase
+        .from('player')
+        .update({ deleted_at: now })
+        .eq('id', player.id);
       if (error) {
         alert('Chyba při mazání hráče: ' + error.message);
         return;
@@ -374,11 +416,33 @@ export default function ManagerDashboard({
     }
   };
 
+  // Load deleted players when toggle is on
+  useEffect(() => {
+    if (!showDeletedPlayers) {
+      setDeletedPlayers([]);
+      return;
+    }
+    supabase
+      .from('player')
+      .select('*')
+      .not('deleted_at', 'is', null)
+      .order('name')
+      .then(({ data }) => setDeletedPlayers(data || []));
+  }, [showDeletedPlayers]);
+
   // Filter players by coach
   const filteredPlayers =
     selectedCoachId === 'all'
       ? players
       : players.filter((p) => p.coach_id === selectedCoachId);
+
+  // Filter deleted players by coach when showing them
+  const filteredDeletedPlayers =
+    showDeletedPlayers && selectedCoachId === 'all'
+      ? deletedPlayers
+      : showDeletedPlayers
+        ? deletedPlayers.filter((p) => p.coach_id === selectedCoachId)
+        : [];
 
   // Filter tournaments by week
   const filteredTournaments =
@@ -899,6 +963,19 @@ export default function ManagerDashboard({
         {/* Filters */}
         <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={showDeletedPlayers}
+                onChange={(e) => setShowDeletedPlayers(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              <span className="text-sm font-medium text-gray-700">
+                Zobrazit smazané hráče
+              </span>
+            </label>
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700">
               Filtrovat podle trenéra:
             </label>
@@ -941,9 +1018,33 @@ export default function ManagerDashboard({
             kód.
           </p>
           <div className="mt-4 space-y-3">
-            {filteredPlayers.length === 0 && (
+            {filteredPlayers.length === 0 && filteredDeletedPlayers.length === 0 && (
               <p className="text-sm text-gray-500">Žádní hráči pro aktuální filtr.</p>
             )}
+            {filteredDeletedPlayers.map((player) => {
+              const isRestoring = restorePlayerLoadingId === player.id;
+              return (
+                <div
+                  key={player.id}
+                  className="rounded-md border border-gray-200 bg-gray-50 p-3 opacity-75"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-gray-600">{player.name}</p>
+                      <p className="text-xs text-gray-500">Smazáno</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRestorePlayer(player)}
+                      disabled={isRestoring}
+                      className="rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-800 hover:bg-green-200 disabled:opacity-50"
+                    >
+                      {isRestoring ? 'Obnovuji…' : 'Obnovit'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
             {filteredPlayers.map((player) => {
               const isLinked = !!player.parent_id;
               const isGenerating = generateCodeLoadingPlayerId === player.id;
@@ -997,7 +1098,7 @@ export default function ManagerDashboard({
                         onClick={() => handleDeletePlayer(player)}
                         disabled={isUnlinking || isGenerating || deletePlayerLoadingId === player.id}
                         className="rounded border border-gray-300 bg-gray-50 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-                        title="Trvale smazat hráče a jeho přihlášky"
+                        title="Skrýt hráče a jeho přihlášky (lze obnovit)"
                       >
                         {deletePlayerLoadingId === player.id ? 'Mažu…' : 'Smazat hráče'}
                       </button>

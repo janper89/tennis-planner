@@ -52,11 +52,12 @@ export default function CoachPage() {
         const nameValue = appUser.name?.trim() || '';
         setUserName(nameValue);
 
-        // Get coach's players
+        // Get coach's players (exclude soft-deleted)
         const { data: playersData } = await supabase
           .from('player')
           .select('*')
           .eq('coach_id', appUser.id)
+          .is('deleted_at', null)
           .order('name');
 
         setPlayers(playersData || []);
@@ -70,7 +71,7 @@ export default function CoachPage() {
 
         const playerIds = playersData.map((p) => p.id);
 
-        // Get all entries for coach's players
+        // Get all entries for coach's players (exclude soft-deleted)
         const { data: entriesData } = await supabase
           .from('entry')
           .select(
@@ -81,6 +82,7 @@ export default function CoachPage() {
           `
           )
           .in('player_id', playerIds)
+          .is('deleted_at', null)
           .order('tournament(datum)', { ascending: true });
 
         // Get unique tournaments

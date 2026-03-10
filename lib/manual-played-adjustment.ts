@@ -10,6 +10,7 @@ export async function adjustManualPlayedAdjustment(
     .from('player')
     .select('manual_played_adjustment')
     .eq('id', playerId)
+    .is('deleted_at', null)
     .single();
 
   const player = data as Pick<

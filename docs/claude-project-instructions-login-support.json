@@ -1,0 +1,119 @@
+{
+  "project_name": "Tennis Planner (Tenisový klub – Plánování turnajů)",
+  "document_purpose": "Support instructions for helping parents with login and account issues. Use this so that when a parent sends a support message, you can respond with a concrete solution without many follow-up questions. Keep replies helpful, simple, and non-technical.",
+  "app_description_and_purpose": {
+    "summary": "Tennis Planner is a web app for a tennis club. Parents use it to manage their children's tournament entries: view and add children (players), connect to existing children via a code from the coach/manager, add or edit tournament entries (planned, registered, withdrawn, played), and see coaches. The app is in Czech; parents log in with email and password and are taken to the parent dashboard.",
+    "main_user_roles": ["parent", "coach", "manager", "player"],
+    "parent_landing_after_login": "/parent"
+  },
+  "authentication_flow": {
+    "provider": "Supabase Auth (email + password only; no social login or magic links in normal flow).",
+    "steps": [
+      "User opens the login page and enters email and password.",
+      "The app calls Supabase Auth (signInWithPassword). Supabase checks the credentials against auth.users.",
+      "If credentials are wrong, the user sees 'Nesprávný email nebo heslo' (Wrong email or password).",
+      "If credentials are correct, the app looks up the user's role: it tries an RPC get_user_role_by_email, or else reads from the app_user table by email.",
+      "If there is no row in app_user for that email, the user sees: 'Uživatel s emailem … nemá přiřazenou roli v databázi.' (User with this email has no role in the database.)",
+      "If there are two or more rows in app_user with the same email, the user sees: 'V databázi je více záznamů se stejným emailem. Kontaktujte administrátora.' (Duplicate emails – contact administrator.)",
+      "If the role is found, the user is redirected by role: parent → /parent, coach → /coach, manager → /manager, player → /player.",
+      "Protected pages (/parent, /coach, /manager, /player, /password) are guarded by middleware: if there is no valid session, the user is redirected to /login. The password-reset page (/password/reset) is accessible without being logged in."
+    ],
+    "password_reset_flow": [
+      "User goes to 'Zapomněli jste heslo?' (Forgot password?) and enters their email.",
+      "The app sends a reset email via Supabase (resetPasswordForEmail). The link in the email opens the app at /password/reset.",
+      "If the link is expired or already used, the page can show: 'Odkaz vypršel nebo byl již použit.' (Link expired or already used.) The user can request a new link.",
+      "On the reset page, the user sets a new password (min 6 characters) and confirms it. Then they are redirected to login.",
+      "If the reset email never arrives: check spam; ensure the app's redirect URL is in Supabase Dashboard → Authentication → URL Configuration → Redirect URLs (e.g. https://your-domain.com/password/reset)."
+    ]
+  },
+  "database_structure_relevant_to_login_and_users": {
+    "supabase_auth_tables": {
+      "auth.users": "Stores the login account: email, encrypted password, email_confirmed_at (must be set for login to work), banned_until (if set, login can be blocked), confirmation_token and recovery_token (should be NULL when not needed).",
+      "auth.identities": "One row per provider (we use 'email'). Must have a row for provider 'email' and the user's id; without it, signInWithPassword can fail even with correct password."
+    },
+    "app_tables": {
+      "app_user": "Application user: id (UUID), email (unique), role (parent/coach/manager/player), created_at. Login matches by email; if no row exists for the signed-in email, the app shows 'nemá přiřazenou roli v databázi'. There is no direct foreign key from app_user to auth.users; linking is by email only."
+    },
+    "important_note": "Login requires both (1) a valid auth.users row (correct password, email_confirmed_at set, no ban, tokens cleared) and (2) a matching app_user row with the same email and a role. Missing or broken auth.identities can also cause 'Invalid login credentials'."
+  },
+  "most_common_login_issues_and_solutions": {
+    "wrong_email_or_password": {
+      "user_sees": "Nesprávný email nebo heslo",
+      "meaning": "Supabase rejected the credentials (wrong email, wrong password, or account/identity issue).",
+      "steps": [
+        "Ask the parent to double-check email (spaces, typos) and password (caps lock, correct account).",
+        "If they are sure it's correct, the account may need a reset: use 'Zapomněli jste heslo?' and have them set a new password via the email link.",
+        "If the reset email never arrives or reset keeps failing, use the admin fix below (set password via script or SQL)."
+      ]
+    },
+    "no_role_in_database": {
+      "user_sees": "Uživatel s emailem … nemá přiřazenou roli v databázi. Zkontroluj, zda je záznam v tabulce app_user.",
+      "meaning": "They logged in to Supabase successfully, but there is no app_user row for that email (or role lookup failed).",
+      "steps": [
+        "Confirm the exact email they use to log in (copy-paste from their message if possible).",
+        "In Supabase: Table Editor → app_user. Check if a row exists with that email. If not, add one with role 'parent' (or the correct role).",
+        "Alternatively run the set-user-password script from the project (see below); it also ensures an app_user row exists."
+      ]
+    },
+    "duplicate_emails": {
+      "user_sees": "V databázi je více záznamů se stejným emailem. Kontaktujte administrátora.",
+      "meaning": "There are two or more rows in app_user with the same email.",
+      "steps": [
+        "In Supabase: Table Editor → app_user. Search by that email and remove or merge duplicate rows so only one row per email remains.",
+        "Reply to the parent that the issue was on our side and they can try logging in again."
+      ]
+    },
+    "forgot_password_link_not_received": {
+      "user_sees": "No error; they just never get the email.",
+      "steps": [
+        "Ask them to check spam/junk and the correct inbox for the address they entered.",
+        "Confirm the app's reset URL is in Supabase: Dashboard → Authentication → URL Configuration → Redirect URLs (e.g. https://your-domain.com/password/reset).",
+        "If email delivery is unreliable, use the admin solution: set their password manually (script or SQL) and send the new password to the parent by a secure channel (e.g. phone or in person), not necessarily email."
+      ]
+    },
+    "reset_link_expired_or_already_used": {
+      "user_sees": "Odkaz vypršel nebo byl již použit.",
+      "steps": [
+        "Tell the parent the link is valid only for a short time (about 1 hour) and can be used only once.",
+        "Ask them to go to the login page, click 'Zapomněli jste heslo?', enter their email again, and use the new link from the latest email."
+      ]
+    },
+    "login_fails_even_with_correct_password_admin_fix": {
+      "meaning": "Parent is sure email/password are correct but still sees wrong email or password; or reset emails do not work and you need to set access manually.",
+      "steps": [
+        "Preferred: From the project root, with .env.local containing NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, run: node scripts/set-user-password.js --email=parent@example.com --password=ChosenSecurePassword",
+        "The script will find or create the user in Supabase Auth and set the password, and will add or confirm the app_user row (default role parent).",
+        "Tell the parent their new temporary password and that they can change it after logging in (e.g. via /password if available).",
+        "If the script cannot find the user (e.g. duplicate or broken auth data): run the SQL that deletes the auth.users and auth.identities row for that email (see fix_filip_marsik_v2.sql as a template), then run set-user-password.js again to create a clean account.",
+        "Alternative: Use the SQL fix (fix_filip_marsik_login.sql) in Supabase SQL Editor: change v_email and v_password at the top to the parent's email and chosen password, then run it. This sets password and email_confirmed_at, fixes identities, and ensures app_user exists."
+      ]
+    },
+    "change_parent_email": {
+      "meaning": "Parent needs to log in with a different email (e.g. old vs new address).",
+      "steps": [
+        "Use the project script: edit scripts/change-user-email.js (set OLD_EMAIL and NEW_EMAIL), then run: node scripts/change-user-email.js. This updates both auth.users and app_user.",
+        "Tell the parent to use the new email and their existing password to log in."
+      ]
+    },
+    "too_many_login_attempts": {
+      "user_sees": "Příliš mnoho pokusů o přihlášení. Zkuste to znovu za minutu. (or HTTP 429)",
+      "meaning": "Rate limit hit (e.g. on the login API).",
+      "steps": [
+        "Ask the parent to wait about a minute and try again once.",
+        "No admin action needed unless it persists; then check rate-limit configuration."
+      ]
+    }
+  },
+  "what_to_ask_the_user_if_the_problem_is_unclear": [
+    "The exact email address they use to log in (copy-paste, to avoid typos).",
+    "The exact message they see on screen (in Czech or English), or a short description (e.g. 'wrong password', 'page says no role', 'nothing happens after I click Login').",
+    "Whether they ever received a password-reset email and whether they clicked the link (and what happened when they did).",
+    "Whether they can open the login page at all, or if the problem is only after entering email and password.",
+    "If they have more than one email address, which one they registered with or which one the club has on file."
+  ],
+  "tone_and_style": {
+    "tone": "Helpful, calm, and simple. Avoid technical jargon when replying to parents.",
+    "do": "Give one clear next step at a time where possible. Confirm what they should see after the fix (e.g. 'You should then see the parent dashboard'). Offer to have them try again and come back if it still does not work.",
+    "avoid": "Long explanations of auth.users vs app_user, or RLS, or internal script names, unless you are writing instructions for an admin."
+  }
+}

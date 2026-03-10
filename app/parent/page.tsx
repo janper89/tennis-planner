@@ -69,14 +69,15 @@ export default function ParentPage() {
           email: c.email,
         }));
 
-        // Get user's children (players)
+        // Get user's children (players, exclude soft-deleted)
         const { data: playersData } = await supabase
           .from('player')
           .select('*')
           .eq('parent_id', appUser.id)
+          .is('deleted_at', null)
           .order('name');
 
-        // Get all entries for user's children
+        // Get all entries for user's children (exclude soft-deleted)
         const playerIds = playersData?.map((p) => p.id) || [];
         const { data: entriesData } = await supabase
           .from('entry')
@@ -88,6 +89,7 @@ export default function ParentPage() {
           `
           )
           .in('player_id', playerIds.length > 0 ? playerIds : ['00000000-0000-0000-0000-000000000000'])
+          .is('deleted_at', null)
           .order('tournament(datum)', { ascending: true });
 
         // Get tournaments

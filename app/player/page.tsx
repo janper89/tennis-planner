@@ -79,6 +79,7 @@ export default function PlayerPage() {
           .from('player')
           .select('*')
           .eq('self_managed_by', appUser.id)
+          .is('deleted_at', null)
           .maybeSingle();
 
         setPlayer(playerData || null);
@@ -100,6 +101,7 @@ export default function PlayerPage() {
           `
           )
           .eq('player_id', playerData.id)
+          .is('deleted_at', null)
           .order('tournament(datum)', { ascending: true });
 
         const tournamentIds =
