@@ -84,6 +84,9 @@ export default function ParentDashboard({
   const [tournamentNameValue, setTournamentNameValue] = useState('');
   const [selectedTournament, setSelectedTournament] = useState<ITFTournamentSearchResult | null>(null);
   const [showOnlyPendingConfirmation, setShowOnlyPendingConfirmation] = useState(false);
+  const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
+  const [editPlayerCategory, setEditPlayerCategory] = useState<string[]>([]);
+  const [editPlayerLoading, setEditPlayerLoading] = useState(false);
   const supabase = createClient();
   const router = useRouter();
 
@@ -652,6 +655,50 @@ export default function ParentDashboard({
     entry.status !== 'odhlasen' &&
     isPastTournament(entry.tournament.datum);
 
+  const VALID_CATEGORIES = ['U16', 'U18'];
+
+  const openEditPlayer = (player: Player) => {
+    setEditingPlayer(player);
+    const cats = player.category;
+    const raw = Array.isArray(cats) ? cats : cats && typeof cats === 'string' ? [cats] : [];
+    setEditPlayerCategory(raw.filter((c) => VALID_CATEGORIES.includes(c)));
+  };
+
+  const handleUpdatePlayerCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPlayer) return;
+    if (editPlayerCategory.length === 0) {
+      alert('Vyber alespoň jednu kategorii');
+      return;
+    }
+    setEditPlayerLoading(true);
+    try {
+      const { error } = await supabase
+        .from('player')
+        .update({ category: editPlayerCategory })
+        .eq('id', editingPlayer.id);
+
+      if (error) {
+        alert('Chyba při ukládání: ' + error.message);
+        return;
+      }
+      setPlayers((prev) =>
+        prev.map((p) =>
+          p.id === editingPlayer.id ? { ...p, category: editPlayerCategory } : p
+        )
+      );
+      setSelectedPlayer((prev) =>
+        prev?.id === editingPlayer.id ? { ...prev!, category: editPlayerCategory } : prev
+      );
+      setEditingPlayer(null);
+    } catch (err) {
+      console.error('Error updating player:', err);
+      alert('Došlo k chybě');
+    } finally {
+      setEditPlayerLoading(false);
+    }
+  };
+
   const handleUpdateName = async () => {
     if (!newName.trim()) {
       alert('Jméno nemůže být prázdné');
@@ -976,9 +1023,20 @@ export default function ParentDashboard({
         {/* Player Overview */}
         {selectedPlayer && (
           <div className="mb-6 rounded-lg bg-white p-6 shadow">
-            <h2 className="mb-4 text-xl font-semibold">
-              {selectedPlayer.name}
-            </h2>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-xl font-semibold">
+                {selectedPlayer.name}
+              </h2>
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={() => openEditPlayer(selectedPlayer)}
+                  className="rounded-md bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200"
+                >
+                  Upravit
+                </button>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
               <div>
                 <p className="text-sm text-gray-600">Datum narození</p>
@@ -1510,6 +1568,73 @@ export default function ParentDashboard({
                 Zatím nemáš žádné přihlášené turnaje.
               </div>
             )}
+          </div>
+        )}
+
+        {/* Edit Player Category Modal */}
+        {editingPlayer && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="mx-4 w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+              <h3 className="mb-4 text-lg font-semibold text-gray-900">
+                Upravit kategorii – {editingPlayer.name}
+              </h3>
+              <form onSubmit={handleUpdatePlayerCategory} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Kategorie *
+                  </label>
+                  <div className="mt-2 flex flex-wrap gap-4">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={editPlayerCategory.includes('U16')}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setEditPlayerCategory((c) => [...c, 'U16']);
+                          } else {
+                            setEditPlayerCategory((c) => c.filter((x) => x !== 'U16'));
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">U16</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={editPlayerCategory.includes('U18')}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setEditPlayerCategory((c) => [...c, 'U18']);
+                          } else {
+                            setEditPlayerCategory((c) => c.filter((x) => x !== 'U18'));
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">U18</span>
+                    </label>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">Vyber alespoň jednu kategorii</p>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingPlayer(null)}
+                    className="rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                  >
+                    Zrušit
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={editPlayerLoading || editPlayerCategory.length === 0}
+                    className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {editPlayerLoading ? 'Ukládám...' : 'Uložit'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
       </main>
