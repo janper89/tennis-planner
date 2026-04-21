@@ -17,17 +17,18 @@
     "next": "16.0.10",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "resend": "^6.12.2",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
-    "dotenv": "^16.4.5",
-    "puppeteer": "^24.0.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^16.4.5",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
+    "puppeteer": "^24.0.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

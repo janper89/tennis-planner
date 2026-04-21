@@ -216,6 +216,79 @@ export interface Database {
           created_at?: string
         }
       }
+      trip: {
+        Row: {
+          id: string
+          coach_id: string
+          title: string
+          destination: string
+          start_at: string
+          end_at: string | null
+          tournament_id: string | null
+          transport: string | null
+          meeting_point: string | null
+          accommodation: string | null
+          cost_note: string | null
+          notes: string | null
+          status: 'planovano' | 'probiha' | 'ukonceno' | 'zruseno'
+          created_at: string
+          updated_at: string
+          deleted_at: string | null
+        }
+        Insert: {
+          id?: string
+          coach_id: string
+          title: string
+          destination: string
+          start_at: string
+          end_at?: string | null
+          tournament_id?: string | null
+          transport?: string | null
+          meeting_point?: string | null
+          accommodation?: string | null
+          cost_note?: string | null
+          notes?: string | null
+          status?: 'planovano' | 'probiha' | 'ukonceno' | 'zruseno'
+          created_at?: string
+          updated_at?: string
+          deleted_at?: string | null
+        }
+        Update: {
+          id?: string
+          coach_id?: string
+          title?: string
+          destination?: string
+          start_at?: string
+          end_at?: string | null
+          tournament_id?: string | null
+          transport?: string | null
+          meeting_point?: string | null
+          accommodation?: string | null
+          cost_note?: string | null
+          notes?: string | null
+          status?: 'planovano' | 'probiha' | 'ukonceno' | 'zruseno'
+          created_at?: string
+          updated_at?: string
+          deleted_at?: string | null
+        }
+      }
+      trip_player: {
+        Row: {
+          trip_id: string
+          player_id: string
+          added_at: string
+        }
+        Insert: {
+          trip_id: string
+          player_id: string
+          added_at?: string
+        }
+        Update: {
+          trip_id?: string
+          player_id?: string
+          added_at?: string
+        }
+      }
     }
   }
 }
