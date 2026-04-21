@@ -109,7 +109,13 @@ function normalizeDate(val) {
 
 function normalizeTournamentName(n) {
   if (!n || typeof n !== 'string') return n || '';
-  return String(n).replace(/^([JW]\d+\s+[A-Za-z]+)\1/i, '$1').trim();
+  const trimmed = String(n).trim();
+  const noDupPrefix = trimmed.replace(/^([JW]\d+\s+[A-Za-z]+)\1/i, '$1');
+  const doubled = noDupPrefix.match(/^(.{4,80}?)\1(\s|$)/i);
+  if (doubled) {
+    return `${doubled[1]}${noDupPrefix.slice(doubled[0].length - 1)}`.trim();
+  }
+  return noDupPrefix;
 }
 
 function titleCaseWords(text) {
@@ -127,6 +133,26 @@ function inferCityFromTournamentName(name) {
   const raw = (m[1] || '').trim();
   if (!raw || raw.length > 80) return null;
   return titleCaseWords(raw);
+}
+
+function inferCityFromFactsheetUrl(factSheetUrl) {
+  if (!factSheetUrl || typeof factSheetUrl !== 'string') return null;
+  try {
+    const u = new URL(factSheetUrl);
+    const parts = (u.pathname || '').split('/').filter(Boolean);
+    const tIdx = parts.findIndex((p) => p === 'tournament');
+    if (tIdx < 0 || !parts[tIdx + 1]) return null;
+    const cityLike = parts[tIdx + 1]
+      .replace(/^j\d+-/i, '')
+      .split('-')
+      .filter(Boolean)
+      .slice(0, 3)
+      .join(' ');
+    if (!cityLike) return null;
+    return titleCaseWords(cityLike);
+  } catch (_) {
+    return null;
+  }
 }
 
 function parseCanonicalTournamentKeyFromFactsheetUrl(factSheetUrl) {
@@ -193,14 +219,21 @@ function toCacheRow(item) {
     item.factSheetUrl ?? item.fact_sheet_url ?? item.factsheet_url
   );
   const sourceKey = item.tournament_key ?? item.tournamentKey ?? null;
+  const sourceFactsheetUrl = item.factSheetUrl ?? item.fact_sheet_url ?? item.factsheet_url;
   const tournament_key =
     canonicalKeyFromUrl ||
     (typeof sourceKey === 'string' ? sourceKey.toUpperCase() : sourceKey);
   const name = normalizeTournamentName(item.name ?? item.tournamentName ?? '');
   const rawCity = (item.city || '').trim();
+  const inferredFromUrl = inferCityFromFactsheetUrl(sourceFactsheetUrl);
   const inferredCity =
-    rawCity && rawCity.toLowerCase() !== 'n/a' ? rawCity : inferCityFromTournamentName(name);
-  const city = (inferredCity || item.country || 'N/A').trim() || 'N/A';
+    rawCity && rawCity.toLowerCase() !== 'n/a'
+      ? rawCity
+      : inferCityFromTournamentName(name) || inferredFromUrl;
+  // Defenzivní sanitizer: i kdyby parser selhal a nechal "(Closed)" v city,
+  // toto ji ustraní. Konzistentní s filtrem UI varianty C.
+  const cityRaw = (inferredCity || item.country || 'N/A').trim() || 'N/A';
+  const city = cityRaw.replace(/\s*\(\s*(closed|cancel{1,2}ed)\s*\)\s*/gi, '').trim() || 'N/A';
   const startDateRaw = item.start_date ?? item.startDate ?? null;
   const start_date = normalizeDate(startDateRaw) || startDateRaw;
   const category = item.category ?? null;
@@ -264,6 +297,22 @@ function dedupeRowsByGroup(rows) {
     byGroup.set(groupKey, preferBetterRow(existing, row));
   }
   return Array.from(byGroup.values());
+}
+
+function buildQualitySummary(rows) {
+  const isNA = (value) => !value || String(value).trim().toUpperCase() === 'N/A';
+  const duplicatedNamePattern = rows.filter((r) => {
+    const name = String(r.name || '').toUpperCase();
+    return /^([JW]\d+\s+[A-Z]+).*\1/.test(name);
+  }).length;
+
+  return {
+    totalRows: rows.length,
+    cityNA: rows.filter((r) => isNA(r.city)).length,
+    nullCategory: rows.filter((r) => !r.category).length,
+    duplicatedNamePattern,
+    invalidStartDate: rows.filter((r) => !/^\d{4}-\d{2}-\d{2}$/.test(String(r.start_date || ''))).length,
+  };
 }
 
 async function main() {
@@ -334,6 +383,8 @@ async function main() {
     process.exit(1);
   }
 
+  console.log('Quality summary (raw input):', buildQualitySummary(rows));
+
   // Odstranit duplicity podle tournament_key (poslední výskyt vyhrává)
   const byKey = new Map();
   for (const row of rows) byKey.set(row.tournament_key, row);
@@ -359,6 +410,7 @@ async function main() {
   }
 
   // Volitelný filtr: jen okno od dneška (+ N měsíců)
+  let cleanupWindow = null;
   if (fromToday || (windowMonths != null && Number.isFinite(windowMonths) && windowMonths > 0)) {
     const today = new Date();
     const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
@@ -380,12 +432,19 @@ async function main() {
     console.log(
       `Filtrované okno: ${start.toISOString().slice(0, 10)} .. ${end.toISOString().slice(0, 10)} (bez konce), ${before} -> ${rows.length} řádků`
     );
+
+    cleanupWindow = {
+      fromISO: start.toISOString().slice(0, 10),
+      toISO: end.toISOString().slice(0, 10),
+    };
   }
 
   if (rows.length === 0) {
     console.error('Po aplikaci filtrů nezbyly žádné řádky k importu.');
     process.exit(1);
   }
+
+  console.log('Quality summary (ready to import):', buildQualitySummary(rows));
 
   const supabase = createClient(url, serviceKey);
   const BATCH = 100;
@@ -419,6 +478,58 @@ async function main() {
   }
 
   console.log('Import done:', ok, 'upserted', err ? `, ${err} failed` : '');
+
+  // Window-diff cleanup: pokud běžíme v okně, smaž v DB vše, co do okna spadá,
+  // ale není ani v source JSONu, ani v overrides. Spouští se jen když není
+  // --replace-all (ten by už smazal všechno jinde) a když nedošlo k zásadnímu
+  // selhání upsertu (jinak bychom mohli smazat data, která se nestihla nahradit).
+  const noCleanup = args.includes('--no-cleanup');
+  if (!replaceAll && !noCleanup && cleanupWindow && err === 0) {
+    try {
+      const { data: dbRows, error: selErr } = await supabase
+        .from('tournament_cache')
+        .select('tournament_key,start_date')
+        .gte('start_date', cleanupWindow.fromISO)
+        .lt('start_date', cleanupWindow.toISO);
+      if (selErr) {
+        console.warn('Window-diff cleanup: SELECT selhal, přeskakuji:', selErr.message);
+      } else {
+        const validKeys = new Set(rows.map((r) => r.tournament_key));
+        const orphanKeys = (dbRows || [])
+          .map((r) => r.tournament_key)
+          .filter((k) => k && !validKeys.has(k));
+        if (orphanKeys.length === 0) {
+          console.log('Window-diff cleanup: žádné orphan klíče v okně.');
+        } else {
+          console.log(`Window-diff cleanup: mažu ${orphanKeys.length} orphan klíčů v okně ${cleanupWindow.fromISO}..${cleanupWindow.toISO}`);
+          // Smazat po dávkách kvůli limitu IN ().
+          const DEL_BATCH = 200;
+          let deleted = 0;
+          for (let i = 0; i < orphanKeys.length; i += DEL_BATCH) {
+            const chunk = orphanKeys.slice(i, i + DEL_BATCH);
+            const { error: delErr } = await supabase
+              .from('tournament_cache')
+              .delete()
+              .in('tournament_key', chunk);
+            if (delErr) {
+              console.error('Window-diff cleanup: DELETE dávka selhala:', delErr.message);
+              break;
+            }
+            deleted += chunk.length;
+          }
+          console.log(`Window-diff cleanup: smazáno ${deleted} záznamů.`);
+        }
+      }
+    } catch (e) {
+      console.warn('Window-diff cleanup: neočekávaná chyba, přeskakuji:', e.message);
+    }
+  } else if (!replaceAll && noCleanup) {
+    console.log('Window-diff cleanup: vypnuto přes --no-cleanup.');
+  } else if (!replaceAll && !cleanupWindow) {
+    console.log('Window-diff cleanup: přeskočeno (bez okna, spusť s --from-today nebo --window-months).');
+  } else if (err > 0) {
+    console.warn('Window-diff cleanup: přeskočeno kvůli chybám v upsertu.');
+  }
 }
 
 main().catch((e) => {

@@ -20,14 +20,18 @@ PLANNING_WINDOW_MONTHS="${CACHE_WINDOW_MONTHS_PLANNING:-6}"
 
 echo "1. Stahuji kalendář (${SEARCH_WINDOW_MONTHS} měsíců dopředu)..."
 node scripts/fetch-calendar-itf-juniors.js --months="${SEARCH_WINDOW_MONTHS}"
+node scripts/validate-tournament-cache.js data/tournament-cache.json
 
 echo "2. Stahuji factsheety a slučuji..."
 if [[ "$*" == *"--no-import"* ]]; then
   node scripts/fetch-factsheets-bulk.js --planning-window-months="${PLANNING_WINDOW_MONTHS}" --search-window-months="${SEARCH_WINDOW_MONTHS}"
+  node scripts/validate-tournament-cache.js data/tournament-cache-full.json
   echo "Hotovo (bez importu)."
 else
   node scripts/fetch-factsheets-bulk.js --import --planning-window-months="${PLANNING_WINDOW_MONTHS}" --search-window-months="${SEARCH_WINDOW_MONTHS}"
   echo "Import do Supabase dokončen."
+  echo "3. Post-import sanity check..."
+  node scripts/post-import-sanity.js "${SEARCH_WINDOW_MONTHS}" || echo "Post-import sanity: varování výše, nezabíjím běh."
 fi
 
 echo "=== Konec ==="

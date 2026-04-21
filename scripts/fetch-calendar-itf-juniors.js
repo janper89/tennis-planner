@@ -50,6 +50,29 @@ async function fetchMonth(page, startMonth) {
     await page.waitForSelector('table, [class*="tournament"], a[href*="tournament"], a[href*="factsheet"]', { timeout: 15000 });
   } catch (_) {}
 
+  // Auto-scroll smyčka: ITF kalendář lazy-loaduje další řádky při scrollu dolů.
+  // Bez tohoto kroku vidíme jen ~30 prvních turnajů a ztrácíme zbytek měsíce.
+  await page.evaluate(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    let prevCount = -1;
+    let stableRounds = 0;
+    const MAX_ITER = 40;
+    const SETTLE_MS = 1500;
+    for (let i = 0; i < MAX_ITER; i++) {
+      const current = document.querySelectorAll('table tbody tr').length;
+      if (current === prevCount) {
+        stableRounds += 1;
+        if (stableRounds >= 3 && i > 3) break;
+      } else {
+        stableRounds = 0;
+      }
+      prevCount = current;
+      window.scrollTo(0, document.body.scrollHeight);
+      await sleep(SETTLE_MS);
+    }
+    window.scrollTo(0, 0);
+  });
+
   return page.evaluate((startMonth) => {
     const out = [];
     const slug = (s) => (s || '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
@@ -76,8 +99,131 @@ async function fetchMonth(page, startMonth) {
       return null;
     }
 
-    // Hledání řádků s turnaji: tabulka nebo kontejnery s daty
-    const tables = document.querySelectorAll('table');
+    // Regex pro zachycení status markeru (CLOSED/CANCELLED) z ITF kalendáře
+    const STATUS_RE = /\s*\(\s*(closed|cancel{1,2}ed)\s*\)\s*/i;
+    function cleanStatusFromCity(s) {
+      return String(s || '').replace(STATUS_RE, '').trim();
+    }
+    function extractStatus(s) {
+      const m = String(s || '').match(STATUS_RE);
+      if (!m) return null;
+      return /cancel/i.test(m[1]) ? 'cancelled' : 'closed';
+    }
+
+    // Odebrání label prefixu "Date:", "City/Town:" atd., který ITF vkládá přes <span class="label">.
+    function stripLabel(text) {
+      return String(text || '')
+        .replace(/^\s*(Date|Host Nation|City\/?Town|City|Town|Category|Surface|Status)\s*:\s*/i, '')
+        .trim();
+    }
+
+    // Převod textového data typu "30 Mar to 03 Apr 2026" na ISO YYYY-MM-DD (bere začátek).
+    const MONTH_MAP = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12 };
+    function parseItfDate(raw) {
+      if (!raw) return '';
+      const s = String(raw).trim();
+      const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+      const num = s.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+      if (num) {
+        const [, d, m, y] = num;
+        const year = y.length === 2 ? '20' + y : y;
+        return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      }
+      const txt = s.match(/(\d{1,2})\s+([A-Za-z]{3})[a-z]*(?:\s+to\s+\d{1,2}\s+[A-Za-z]{3,}\s+\d{4}|\s+\d{4}|,?\s+\d{4})?/);
+      if (txt) {
+        const day = txt[1];
+        const monKey = txt[2].toLowerCase().slice(0, 3);
+        const mon = MONTH_MAP[monKey];
+        const yearMatch = s.match(/(20\d{2})/);
+        const year = yearMatch ? yearMatch[1] : null;
+        if (mon && year) {
+          return `${year}-${String(mon).padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+      }
+      return '';
+    }
+
+    // Parsing přes stabilní CSS classy, které ITF používá (`whatson-table__tournament`).
+    function parseStructuredRow(row) {
+      const nameCell = row.querySelector('td.name');
+      const nameLink = nameCell ? nameCell.querySelector('a[href]') : null;
+      if (!nameLink) return null;
+      // Preferuj div.short, který obsahuje jen čistý název. Fallback na textContent linku (zdvojí se kvůli visually-hidden spanům).
+      const shortName = (nameCell.querySelector('.short') || {}).textContent;
+      const nameText = (shortName && shortName.trim()) || (nameLink.textContent || '').trim();
+      if (!nameText) return null;
+
+      const dateCell = row.querySelector('td.date');
+      const dateText = dateCell
+        ? stripLabel((dateCell.querySelector('span.date') || dateCell).textContent || '')
+        : '';
+      const locCell = row.querySelector('td.location');
+      const locText = locCell
+        ? stripLabel((locCell.querySelector('span.location') || locCell).textContent || '')
+        : '';
+      const hostCell = row.querySelector('td.hostname');
+      const hostText = hostCell
+        ? stripLabel((hostCell.querySelector('span.hostname') || hostCell).textContent || '')
+        : '';
+      const catCell = row.querySelector('td.category');
+      const catText = catCell
+        ? stripLabel((catCell.querySelector('span.category') || catCell).textContent || '')
+        : '';
+      const surfCell = row.querySelector('td.surface');
+      const surfText = surfCell
+        ? stripLabel((surfCell.querySelector('span.surface') || surfCell).textContent || '')
+        : '';
+      const statusCell = row.querySelector('td.status');
+      // Status je ve druhém span (první je label). Pokud je prázdný, turnaj je aktivní.
+      let statusText = '';
+      if (statusCell) {
+        const spans = statusCell.querySelectorAll('span');
+        if (spans.length >= 2) statusText = (spans[1].textContent || '').trim();
+        else statusText = stripLabel(statusCell.textContent || '');
+      }
+      let statusNorm = null;
+      if (/cancel/i.test(statusText)) statusNorm = 'cancelled';
+      else if (/closed/i.test(statusText)) statusNorm = 'closed';
+      // Fallback: status může být pouze v názvu (starší parse), nebo v class modifieru.
+      if (!statusNorm && /--cancelled/.test(row.className)) statusNorm = 'cancelled';
+      if (!statusNorm && /--closed/.test(row.className)) statusNorm = 'closed';
+      if (!statusNorm) statusNorm = extractStatus(nameText);
+
+      const iso = parseItfDate(dateText);
+      if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+
+      const factSheetUrl = nameLink.href && isTournamentHref(nameLink.href) ? nameLink.href : null;
+      const tournamentId = getTournamentIdFromLink(nameLink);
+      const category = /^J\d+$/i.test(catText) ? catText : null;
+
+      return {
+        tournamentKey: tournamentId || `itf-juniors-${slug(nameText)}-${iso}`,
+        tournamentName: normalizeTournamentName(nameText),
+        city: cleanStatusFromCity(locText) || 'N/A',
+        startDate: iso,
+        category: category,
+        factSheetUrl: factSheetUrl,
+        status: statusNorm,
+        surface: surfText || null,
+        country: hostText || null,
+      };
+    }
+
+    // Preferovaná cesta: strukturované řádky whatson-table.
+    const structuredRows = document.querySelectorAll('tr.whatson-table__tournament');
+    for (const row of structuredRows) {
+      const parsed = parseStructuredRow(row);
+      if (!parsed) continue;
+      const nameLower = (parsed.tournamentName || '').toLowerCase();
+      if (nameLower.includes('wheelchair')) continue;
+      if (nameLower.includes('junior finals') || nameLower.includes('world tennis tour junior finals')) continue;
+      if (parsed.factSheetUrl && parsed.factSheetUrl.toLowerCase().includes('wheelchair')) continue;
+      out.push(parsed);
+    }
+
+    // Heuristická tabulková cesta (ponechána jako fallback pro případnou změnu designu).
+    const tables = structuredRows.length > 0 ? [] : document.querySelectorAll('table');
     for (const table of tables) {
       const rows = table.querySelectorAll('tbody tr, tr');
       for (const row of rows) {
@@ -107,26 +253,33 @@ async function fetchMonth(page, startMonth) {
         const dateCandidates = [];
         let city = '';
         let category = '';
+        let status = null;
         const cellTexts = Array.from(cells).map((c) => (c.textContent || '').trim());
+
         for (let i = 0; i < cellTexts.length; i++) {
           const t = cellTexts[i];
           if (/\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}|\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}/.test(t)) {
             dateCandidates.push(t);
           }
-          if (/^[A-Za-z\s\-]+$/.test(t) && t.length > 1 && t.length < 80 && !t.match(/^(J\d+|Category|Date|City|Nation)$/i)) {
-            if (!city && i > 0) city = t;
+          const txtDate = parseItfDate(t);
+          if (txtDate) dateCandidates.push(txtDate);
+          if (!city && /^[A-Za-z\s\-]+$/.test(t) && t.length > 1 && t.length < 80 && !t.match(/^(J\d+|Category|Date|City|Nation|Town|Status|Surface)$/i)) {
+            if (i > 0) city = cleanStatusFromCity(t);
           }
-          if (/^J\d+$/i.test(t)) category = t;
+          if (!category && /^J\d+$/i.test(t)) category = t;
+          if (!status) {
+            const s = extractStatus(t);
+            if (s) status = s;
+          }
         }
-        // Použij poslední datum v řádku (skutečné datum turnaje), ne první (často společné „týden 2.1.“)
-        if (dateCandidates.length > 0) {
-          dateStr = dateCandidates[dateCandidates.length - 1];
-        }
+        if (dateCandidates.length > 0) dateStr = dateCandidates[dateCandidates.length - 1];
         if (!dateStr) {
           const dateCell = row.querySelector('td[class*="date"], [data-date]');
           if (dateCell) dateStr = (dateCell.textContent || '').trim();
         }
         if (!city) city = 'N/A';
+        city = cleanStatusFromCity(city) || city;
+        if (!status) status = extractStatus(name);
 
         if (!name) continue;
         name = normalizeTournamentName(name);
@@ -160,6 +313,7 @@ async function fetchMonth(page, startMonth) {
           startDate,
           category: category || null,
           factSheetUrl: factSheetUrl || null,
+          status: status || null,
         });
       }
     }

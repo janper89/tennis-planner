@@ -122,6 +122,10 @@ jobs:
           cp data/all.json data/tournament-cache.json
           cp data/all.json data/tournament-cache-state.json
 
+      - name: Validate cache before import
+        run: |
+          node scripts/validate-tournament-cache.js data/tournament-cache.json
+
       - name: Import to Supabase (okno 4 měsíců dopředu, replace = vždy čerstvá cache)
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}

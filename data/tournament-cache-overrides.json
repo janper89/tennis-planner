@@ -1,5 +1,9 @@
 [
   {"tournament_key":"J-J100-GBR-2026-004","name":"J100 Loughborough","city":"Loughborough","start_date":"2026-03-02","category":"J100","country":"GBR","tournament_key_factsheet":"J-J100-GBR-2026-004"},
   {"tournament_key":"MANUAL-J100-LOUGHBOROUGH-GBR-2026-03-09","name":"J100 Loughborough","city":"Loughborough","start_date":"2026-03-09","category":"J100","country":"GBR","venue":"Loughborough","tournament_key_factsheet":"MANUAL-J100-LOUGHBOROUGH-GBR-2026-03-09"},
-  {"tournament_key":"MANUAL-J100-ISTANBUL-TUR-2026-04-20","name":"J100 Istanbul","city":"Istanbul","start_date":"2026-04-20","category":"J100","country":"TUR","venue":"Istanbul","tournament_key_factsheet":"MANUAL-J100-ISTANBUL-TUR-2026-04-20"}
+  {"tournament_key":"MANUAL-J100-ISTANBUL-TUR-2026-04-20","name":"J100 Istanbul","city":"Istanbul","start_date":"2026-04-20","category":"J100","country":"TUR","venue":"Istanbul","tournament_key_factsheet":"MANUAL-J100-ISTANBUL-TUR-2026-04-20"},
+
+  {"tournament_key":"J-J30-UZB-2026-002","name":"J30 Fergana","city":"Fergana","venue":"Fergana Open","start_date":"2026-05-04","category":"J30","country":"UZB","surface":"Hard - O","tournament_key_factsheet":"J-J30-UZB-2026-002"},
+
+  {"tournament_key":"MANUAL-J30-HRADEC-KRALOVE-CZE-2026-05-25","name":"J30 Hradec Kralove","city":"Hradec Kralove","start_date":"2026-05-25","category":"J30","country":"CZE","venue":"Hradec Kralove","surface":"Clay - O","tournament_key_factsheet":"MANUAL-J30-HRADEC-KRALOVE-CZE-2026-05-25"}
 ]

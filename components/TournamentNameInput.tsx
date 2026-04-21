@@ -8,6 +8,13 @@ import type { ITFTournamentSearchResult } from '@/lib/tournament-service';
 
 const DEBOUNCE_MS = 300;
 
+// Varianta C: ve výběru nezobrazujeme zrušené ani uzavřené turnaje.
+// Parser drží status v závorce přímo v názvu, např. "J60 Vyshkovo (CLOSED)".
+const CANCELLED_STATUS_RE = /\((closed|cancell?ed|cancelled)\)/i;
+function isActiveTournament(t: ITFTournamentSearchResult): boolean {
+  return !CANCELLED_STATUS_RE.test(t.name || '');
+}
+
 interface TournamentNameInputProps {
   value: string;
   onChange: (value: string) => void;
@@ -49,7 +56,8 @@ export default function TournamentNameInput({
       setLoading(true);
       setError(null);
       try {
-        const results = await searchTournamentsByName(supabase, trimmedQuery, 20);
+        const rawResults = await searchTournamentsByName(supabase, trimmedQuery, 20);
+        const results = rawResults.filter(isActiveTournament);
         setSuggestions(results);
         setIsOpen(results.length > 0);
         setHighlightedIndex(-1);

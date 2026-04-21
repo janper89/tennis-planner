@@ -191,6 +191,16 @@ async function main() {
   fs.writeFileSync(outputPath, JSON.stringify(merged, null, 2), 'utf8');
   console.log('Uloženo', merged.length, 'turnajů do', outputPath, '(kalendář + factsheet merge)');
 
+  try {
+    execSync(`node "${path.join(__dirname, 'validate-tournament-cache.js')}" "${outputPath}"`, {
+      stdio: 'inherit',
+      cwd: path.resolve(__dirname, '..'),
+    });
+  } catch (_) {
+    console.error('Validace cache po merge selhala.');
+    process.exit(1);
+  }
+
   if (doImport && merged.length > 0) {
     console.log('Spouštím import do Supabase...');
     try {

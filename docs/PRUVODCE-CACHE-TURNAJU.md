@@ -196,6 +196,13 @@ Pokud tam už máš `NEXT_PUBLIC_SUPABASE_URL` a `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    ```
    Pokud uvidíš chybu „Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY“, vrať se ke kroku 4 a zkontroluj `.env.local`.
 
+4. Před importem (nebo po refreshi) spusť validaci cache:
+   ```bash
+   node scripts/validate-tournament-cache.js data/tournament-cache.json
+   node scripts/validate-tournament-cache.js data/tournament-cache-full.json
+   ```
+   Validace failne při chybějícím `tournamentKey` / nečitelném datu. Ostatní metriky (např. `cityNA`) slouží jako quality report.
+
 ---
 
 ## Krok 6: Ověřit vyhledávání v aplikaci
@@ -232,3 +239,10 @@ Pokud tam už máš `NEXT_PUBLIC_SUPABASE_URL` a `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 | 6 | V aplikaci jako rodič vyzkoušet vyhledání podle názvu turnaje. |
 
 Až to jednou projdeš, příště stačí aktualizovat `data/tournament-cache.json` (nové/upravené turnaje) a znovu spustit import – skript provede upsert podle `tournament_key`, takže se záznamy aktualizují bez duplicit.
+
+## Provozní checklist (měsíční běh)
+
+- Spusť `./scripts/refresh-tournaments.sh --no-import` a ověř, že neskončí na validaci.
+- Zkontroluj quality report (`cityNA`, `duplicatedNamePattern`, `nullCategory`) a porovnej s minulým během.
+- Pokud jsou metriky podezřele horší, uprav `data/tournament-cache-overrides.json` nebo proveď ruční kontrolu problematických turnajů.
+- Teprve potom spusť import (`./scripts/refresh-tournaments.sh` nebo `node scripts/import-tournament-cache.js ...`).
