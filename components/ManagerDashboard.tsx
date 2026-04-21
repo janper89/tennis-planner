@@ -690,13 +690,11 @@ export default function ManagerDashboard({
         .eq('birth_date', birthDate)
         .is('deleted_at', null);
       if (existing?.length) {
-        const proceed = window.confirm(
-          `Hráč se stejným jménem a datem narození už existuje (${existing[0].name}). Chcete přesto přidat nového hráče?`
+        alert(
+          `Hráč se stejným jménem a datem narození už existuje (${existing[0].name}). Duplicitního hráče nelze přidat.`
         );
-        if (!proceed) {
-          setAddPlayerLoading(false);
-          return;
-        }
+        setAddPlayerLoading(false);
+        return;
       }
 
       const limitTurnaju = getMaxTournamentsForAge(getAgeFromBirthDate(birthDate));

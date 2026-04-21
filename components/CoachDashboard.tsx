@@ -220,13 +220,11 @@ export default function CoachDashboard({
         .eq('birth_date', birthDate)
         .is('deleted_at', null);
       if (existing?.length) {
-        const proceed = confirm(
-          `Hráč se stejným jménem a datem narození už existuje (${existing[0].name}). Chcete přesto přidat nového hráče?`
+        alert(
+          `Hráč se stejným jménem a datem narození už existuje (${existing[0].name}). Duplicitního hráče nelze přidat.`
         );
-        if (!proceed) {
-          setLoading(false);
-          return;
-        }
+        setLoading(false);
+        return;
       }
 
       const limitTurnaju = getMaxTournamentsForAge(

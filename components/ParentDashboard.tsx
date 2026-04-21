@@ -524,13 +524,11 @@ export default function ParentDashboard({
           .eq('birth_date', birthDate)
           .is('deleted_at', null);
         if (existing?.length) {
-          const proceed = confirm(
-            `Hráč se stejným jménem a datem narození už existuje (${existing[0].name}). Chcete přesto přidat nového hráče?`
+          alert(
+            `Hráč se stejným jménem a datem narození už existuje (${existing[0].name}). Duplicitního hráče nelze přidat.`
           );
-          if (!proceed) {
-            setLoading(false);
-            return;
-          }
+          setLoading(false);
+          return;
         }
         // Use appUser.id for parent_id
         const { error: playerError } = await supabase.from('player').insert({
@@ -558,13 +556,11 @@ export default function ParentDashboard({
         .eq('birth_date', birthDate)
         .is('deleted_at', null);
       if (existingAdmin?.length) {
-        const proceed = confirm(
-          `Hráč se stejným jménem a datem narození už existuje (${existingAdmin[0].name}). Chcete přesto přidat nového hráče?`
+        alert(
+          `Hráč se stejným jménem a datem narození už existuje (${existingAdmin[0].name}). Duplicitního hráče nelze přidat.`
         );
-        if (!proceed) {
-          setLoading(false);
-          return;
-        }
+        setLoading(false);
+        return;
       }
       const limitTurnaju = getMaxTournamentsForAge(
         getAgeFromBirthDate(birthDate)
