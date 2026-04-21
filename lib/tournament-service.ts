@@ -82,17 +82,33 @@ function tournamentMetadataScore(tournament: Tournament): number {
   return score;
 }
 
+function isIsoDateOnly(value: string | undefined | null): value is string {
+  return !!value && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
 function buildTournamentEnrichmentUpdate(
   existing: Tournament,
   source: ITFTournamentSearchResult
 ): Partial<TournamentInsertType> {
   const patch: Partial<TournamentInsertType> = {};
   const normalizedName = normalizeTournamentName(source.name);
+  const srcKey = (source.tournamentKey || '').toUpperCase();
+  const exKey = (existing.tournament_key || '').toUpperCase();
+  const keysMatch = !!srcKey && !!exKey && srcKey === exKey;
 
   if (!existing.nazev && normalizedName) patch.nazev = normalizedName;
   if (!existing.kategorie && source.category) patch.kategorie = source.category;
   if (!existing.misto && source.city) patch.misto = source.city;
   if (!existing.datum && source.startDate) patch.datum = source.startDate;
+  // Stejný ITF klíč jako v cache: datum z cache je zdroj pravdy (oprava legacy řádků se špatným dnem).
+  if (
+    keysMatch &&
+    isCanonicalTournamentKey(source.tournamentKey) &&
+    isIsoDateOnly(source.startDate) &&
+    existing.datum !== source.startDate
+  ) {
+    patch.datum = source.startDate;
+  }
   if (!existing.sign_in_deadline_text && source.entryDeadline) {
     patch.sign_in_deadline_text = source.entryDeadline;
   }
@@ -116,6 +132,9 @@ function buildTournamentEnrichmentUpdate(
     !existing.tournament_key
   ) {
     patch.tournament_key = source.tournamentKey;
+    if (isIsoDateOnly(source.startDate) && existing.datum !== source.startDate) {
+      patch.datum = source.startDate;
+    }
   }
 
   return patch;
@@ -511,6 +530,46 @@ export async function createEntry(
   }
 }
 
+async function findExistingEntry(
+  playerId: string,
+  tournamentId: string,
+  supabase: SupabaseClient<Database>
+): Promise<Entry | null> {
+  const { data, error } = await supabase
+    .from('entry')
+    .select('*')
+    .eq('player_id', playerId)
+    .eq('tournament_id', tournamentId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ?? null;
+}
+
+async function restoreSoftDeletedEntry(
+  entry: Entry,
+  priority: number,
+  poznamka: string | null,
+  supabase: SupabaseClient<Database>
+): Promise<Entry> {
+  const { data, error } = await supabase
+    .from('entry')
+    .update({
+      deleted_at: null,
+      status: 'planovano',
+      priority,
+      poznamka_rodic: poznamka,
+    } as never)
+    .eq('id', entry.id)
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 /**
  * Main function: Register a player for a tournament
  * 
@@ -557,8 +616,9 @@ export async function registerPlayerForTournament(
       tournament = await enrichTournamentIfMissing(tournament, searchResult, supabase);
     }
 
-    // Fallback: semantic match (same name/city/category around the same date)
-    if (!tournament) {
+    // Fallback: semantic match jen bez kanonického ITF klíče. Jinak by se špatně spároval
+    // např. starý řádek „J100 Budapest“ s jiným datem než v cache (J-J100-HUN-2026-001).
+    if (!tournament && !isCanonicalTournamentKey(searchResult.tournamentKey)) {
       tournament = await findTournamentBySemanticMatch(searchResult, supabase);
       if (tournament) {
         tournament = await enrichTournamentIfMissing(tournament, searchResult, supabase);
@@ -588,13 +648,44 @@ export async function registerPlayerForTournament(
     }
 
     // Step 4: Create entry for the player
-    const entry = await createEntry(
-      params.playerId,
-      tournament.id,
-      params.priority,
-      params.poznamka || null,
-      supabase
-    );
+    let entry: Entry;
+    try {
+      entry = await createEntry(
+        params.playerId,
+        tournament.id,
+        params.priority,
+        params.poznamka || null,
+        supabase
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes('již na tento turnaj přihlášen')) {
+        throw error;
+      }
+
+      const existingEntry = await findExistingEntry(params.playerId, tournament.id, supabase);
+      if (!existingEntry) {
+        throw error;
+      }
+
+      if (existingEntry.deleted_at) {
+        entry = await restoreSoftDeletedEntry(
+          existingEntry,
+          params.priority,
+          params.poznamka || null,
+          supabase
+        );
+      } else {
+        // Stejná aktivní přihláška už existuje – chovej se idempotentně (reload seznamu).
+        return {
+          success: true,
+          tournamentId: tournament.id,
+          entryId: existingEntry.id,
+          message: 'Hráč je již na tento turnaj přihlášen – přihláška v seznamu už je.',
+          tournament,
+        };
+      }
+    }
 
     // Step 5: Return success result
     return {
