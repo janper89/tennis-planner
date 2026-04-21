@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import CoachDashboard from '@/components/CoachDashboard';
 import type { Database } from '@/types/database';
+import { fetchTournamentsByIds, mergeTournamentsFromMap } from '@/lib/merge-entry-tournaments';
 
 type Player = Database['public']['Tables']['player']['Row'];
 type Tournament = Database['public']['Tables']['tournament']['Row'];
@@ -95,7 +96,19 @@ export default function CoachPage() {
           .in('id', tournamentIds.length > 0 ? tournamentIds : ['00000000-0000-0000-0000-000000000000'])
           .order('datum', { ascending: true });
 
-        setEntries((entriesData as Entry[]) || []);
+        let rawEntries = (entriesData as Entry[]) || [];
+        const fromList = new Map((tournamentsData || []).map((t) => [t.id, t]));
+        rawEntries = mergeTournamentsFromMap(rawEntries, fromList);
+
+        const stillMissing = rawEntries
+          .filter((e) => !e.tournament)
+          .map((e) => e.tournament_id);
+        if (stillMissing.length > 0) {
+          const extra = await fetchTournamentsByIds(supabase, stillMissing);
+          rawEntries = mergeTournamentsFromMap(rawEntries, extra);
+        }
+
+        setEntries(rawEntries.filter((e) => e.tournament));
         setTournaments(tournamentsData || []);
       } catch (error) {
         console.error('Error loading data:', error);

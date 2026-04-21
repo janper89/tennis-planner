@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import ParentDashboard from '@/components/ParentDashboard';
 import type { Database } from '@/types/database';
+import { fetchTournamentsByIds, mergeTournamentsFromMap } from '@/lib/merge-entry-tournaments';
 
 type Player = Database['public']['Tables']['player']['Row'];
 type Tournament = Database['public']['Tables']['tournament']['Row'];
@@ -100,8 +101,29 @@ export default function ParentPage() {
           .in('id', tournamentIds.length > 0 ? tournamentIds : ['00000000-0000-0000-0000-000000000000'])
           .order('datum', { ascending: true });
 
+        let rawEntries = (entriesData as Entry[]) || [];
+        const fromList = new Map((tournamentsData || []).map((t) => [t.id, t]));
+        rawEntries = mergeTournamentsFromMap(rawEntries, fromList);
+
+        const stillMissing = rawEntries
+          .filter((e) => !e.tournament)
+          .map((e) => e.tournament_id);
+        if (stillMissing.length > 0) {
+          const extra = await fetchTournamentsByIds(supabase, stillMissing);
+          rawEntries = mergeTournamentsFromMap(rawEntries, extra);
+        }
+
+        const normalizedEntries = rawEntries.filter((entry) => {
+          if (entry.tournament) return true;
+          console.warn('[parent/page] Entry references missing tournament row (RLS?)', {
+            entryId: entry.id,
+            tournamentId: entry.tournament_id,
+          });
+          return false;
+        });
+
         setPlayers(playersData || []);
-        setEntries((entriesData as Entry[]) || []);
+        setEntries(normalizedEntries);
         setTournaments(tournamentsData || []);
         setCoaches(coachesList);
       } catch {

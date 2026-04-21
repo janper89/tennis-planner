@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import PlayerDashboard from '@/components/PlayerDashboard';
 import type { Database } from '@/types/database';
+import { fetchTournamentsByIds, mergeTournamentsFromMap } from '@/lib/merge-entry-tournaments';
 import {
   getAgeFromBirthDate,
   getMaxTournamentsForAge,
@@ -118,7 +119,28 @@ export default function PlayerPage() {
           )
           .order('datum', { ascending: true });
 
-        setEntries((entriesData as Entry[]) || []);
+        let rawEntries = (entriesData as Entry[]) || [];
+        const fromList = new Map((tournamentsData || []).map((t) => [t.id, t]));
+        rawEntries = mergeTournamentsFromMap(rawEntries, fromList);
+
+        const stillMissing = rawEntries
+          .filter((e) => !e.tournament)
+          .map((e) => e.tournament_id);
+        if (stillMissing.length > 0) {
+          const extra = await fetchTournamentsByIds(supabase, stillMissing);
+          rawEntries = mergeTournamentsFromMap(rawEntries, extra);
+        }
+
+        const normalizedEntries = rawEntries.filter((entry) => {
+          if (entry.tournament) return true;
+          console.warn('[player/page] Entry references missing tournament row (RLS?)', {
+            entryId: entry.id,
+            tournamentId: entry.tournament_id,
+          });
+          return false;
+        });
+
+        setEntries(normalizedEntries);
         setTournaments(tournamentsData || []);
       } catch {
         setLoading(false);
