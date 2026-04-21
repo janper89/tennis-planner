@@ -82,6 +82,8 @@ export default function TripsSection({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPast, setShowPast] = useState(false);
+  /** null = ještě nezkontrolováno (nebo chyba fetch), false = Resend není nastaven */
+  const [tripEmailsEnabled, setTripEmailsEnabled] = useState<boolean | null>(null);
 
   const canEdit = mode === 'coach' || mode === 'manager';
 
@@ -101,6 +103,24 @@ export default function TripsSection({
   useEffect(() => {
     load();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!canEdit) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/trips/email-status');
+        if (!res.ok) return;
+        const data = (await res.json()) as { emailsEnabled?: boolean };
+        if (!cancelled) setTripEmailsEnabled(Boolean(data.emailsEnabled));
+      } catch {
+        if (!cancelled) setTripEmailsEnabled(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canEdit]);
 
   const now = new Date();
   const { upcoming, past } = useMemo(() => {
@@ -270,7 +290,9 @@ export default function TripsSection({
           <h2 className="text-xl font-bold text-gray-900">Výjezdy</h2>
           <p className="text-sm text-gray-600">
             {canEdit
-              ? 'Vytvoř výjezd, přiřaď hráče a rodičům přijde informace e-mailem.'
+              ? tripEmailsEnabled === false
+                ? 'Vytvoř výjezd a přiřaď hráče — výjezd se uloží v aplikaci. E-maily rodičům zapneš později (viz žlutý box níže).'
+                : 'Vytvoř výjezd, přiřaď hráče a rodičům přijde informace e-mailem.'
               : 'Zde se zobrazují výjezdy, na které je hráč přiřazený.'}
           </p>
         </div>
@@ -284,6 +306,24 @@ export default function TripsSection({
           </button>
         )}
       </div>
+
+      {canEdit && tripEmailsEnabled === false && (
+        <div
+          role="status"
+          className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+        >
+          <p className="font-medium">E-maily zatím nejsou zapnuté</p>
+          <p className="mt-1 text-amber-900">
+            Aby rodiče (a self-managed hráči) dostávali upozornění při výjezdu, doplníš později
+            proměnné prostředí{' '}
+            <code className="rounded bg-amber-100/80 px-1 py-0.5 text-xs">RESEND_API_KEY</code> a{' '}
+            <code className="rounded bg-amber-100/80 px-1 py-0.5 text-xs">RESEND_FROM_EMAIL</code>{' '}
+            do souboru <code className="rounded bg-amber-100/80 px-1 py-0.5 text-xs">.env.local</code>{' '}
+            (lokálně) a do nastavení projektu na Vercelu (produkce), pak restart dev serveru nebo
+            redeploy. Do té doby výjezdy fungují normálně, jen se maily neposílají.
+          </p>
+        </div>
+      )}
 
       {loading && <p className="text-sm text-gray-500">Načítání výjezdů…</p>}
 
