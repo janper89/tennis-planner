@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type Dispatch, type SetStateAction } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -103,6 +103,9 @@ export default function ManagerDashboard({
   const [editingParentId, setEditingParentId] = useState<string | null>(null);
   const [editingParentName, setEditingParentName] = useState('');
   const [editingParentLoading, setEditingParentLoading] = useState(false);
+  const [parentsSectionOpen, setParentsSectionOpen] = useState(false);
+  const [playerAccountsSectionOpen, setPlayerAccountsSectionOpen] = useState(false);
+  const [linkingSectionOpen, setLinkingSectionOpen] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -115,7 +118,34 @@ export default function ManagerDashboard({
     // Load parents and player accounts
     loadParents();
     loadPlayerAccounts();
+    // Restore collapsed sections state
+    if (typeof window !== 'undefined') {
+      try {
+        if (localStorage.getItem('manager.parentsOpen') === '1') setParentsSectionOpen(true);
+        if (localStorage.getItem('manager.playerAccountsOpen') === '1') setPlayerAccountsSectionOpen(true);
+        if (localStorage.getItem('manager.linkingOpen') === '1') setLinkingSectionOpen(true);
+      } catch {
+        // ignore (e.g. Safari private mode)
+      }
+    }
   }, []);
+
+  const toggleSection = (
+    key: 'manager.parentsOpen' | 'manager.playerAccountsOpen' | 'manager.linkingOpen',
+    setter: Dispatch<SetStateAction<boolean>>
+  ) => {
+    setter((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(key, next ? '1' : '0');
+        } catch {
+          // ignore
+        }
+      }
+      return next;
+    });
+  };
 
   const loadParents = async () => {
     try {
@@ -866,20 +896,42 @@ export default function ManagerDashboard({
         {/* Parents Management Section */}
         <div className="mb-6 rounded-lg bg-white p-6 shadow">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-xl font-semibold text-gray-900">
-              Správa rodičů
-            </h2>
             <button
-              onClick={() => {
-                setShowAddParentForm(!showAddParentForm);
-                setNewParentEmail('');
-              }}
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              type="button"
+              onClick={() => toggleSection('manager.parentsOpen', setParentsSectionOpen)}
+              aria-expanded={parentsSectionOpen}
+              className="flex flex-1 items-center gap-2 text-left"
             >
-              {showAddParentForm ? 'Zrušit' : '+ Přidat rodiče'}
+              <span
+                className={`inline-block text-gray-500 transition-transform ${
+                  parentsSectionOpen ? 'rotate-90' : ''
+                }`}
+                aria-hidden="true"
+              >
+                ▸
+              </span>
+              <h2 className="text-xl font-semibold text-gray-900">
+                Správa rodičů{' '}
+                <span className="text-sm font-normal text-gray-500">
+                  ({parents.length})
+                </span>
+              </h2>
             </button>
+            {parentsSectionOpen && (
+              <button
+                onClick={() => {
+                  setShowAddParentForm(!showAddParentForm);
+                  setNewParentEmail('');
+                }}
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                {showAddParentForm ? 'Zrušit' : '+ Přidat rodiče'}
+              </button>
+            )}
           </div>
 
+          {parentsSectionOpen && (
+          <>
           {/* Add Parent Form */}
           {showAddParentForm && (
             <form onSubmit={handleAddParent} className="mb-4 space-y-4">
@@ -958,6 +1010,8 @@ export default function ManagerDashboard({
               </div>
             )}
           </div>
+          </>
+          )}
         </div>
 
         {/* Edit Parent Profile Modal */}
@@ -1008,19 +1062,41 @@ export default function ManagerDashboard({
         {/* Player accounts (self-service role) */}
         <div className="mb-6 rounded-lg bg-white p-6 shadow">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-xl font-semibold text-gray-900">
-              Účty hráčů (self-service)
-            </h2>
             <button
-              onClick={() => {
-                setShowAddPlayerAccountForm(!showAddPlayerAccountForm);
-                setNewPlayerAccountEmail('');
-              }}
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              type="button"
+              onClick={() => toggleSection('manager.playerAccountsOpen', setPlayerAccountsSectionOpen)}
+              aria-expanded={playerAccountsSectionOpen}
+              className="flex flex-1 items-center gap-2 text-left"
             >
-              {showAddPlayerAccountForm ? 'Zrušit' : '+ Přidat hráče (účet)'}
+              <span
+                className={`inline-block text-gray-500 transition-transform ${
+                  playerAccountsSectionOpen ? 'rotate-90' : ''
+                }`}
+                aria-hidden="true"
+              >
+                ▸
+              </span>
+              <h2 className="text-xl font-semibold text-gray-900">
+                Účty hráčů (self-service){' '}
+                <span className="text-sm font-normal text-gray-500">
+                  ({playerAccounts.length})
+                </span>
+              </h2>
             </button>
+            {playerAccountsSectionOpen && (
+              <button
+                onClick={() => {
+                  setShowAddPlayerAccountForm(!showAddPlayerAccountForm);
+                  setNewPlayerAccountEmail('');
+                }}
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                {showAddPlayerAccountForm ? 'Zrušit' : '+ Přidat hráče (účet)'}
+              </button>
+            )}
           </div>
+          {playerAccountsSectionOpen && (
+          <>
           <p className="mb-4 text-sm text-gray-600">
             Účet s rolí hráč. Hráč se přihlásí emailem, jednou si vytvoří profil a pak si sám přidává turnaje.
           </p>
@@ -1084,6 +1160,8 @@ export default function ManagerDashboard({
               </div>
             )}
           </div>
+          </>
+          )}
         </div>
 
         {/* Add Player */}
@@ -1233,7 +1311,30 @@ export default function ManagerDashboard({
         </div>
 
         <div className="mb-6 rounded-lg bg-white p-6 shadow">
-          <h2 className="text-xl font-semibold text-gray-900">Propojení rodičů</h2>
+          <button
+            type="button"
+            onClick={() => toggleSection('manager.linkingOpen', setLinkingSectionOpen)}
+            aria-expanded={linkingSectionOpen}
+            className="flex w-full items-center gap-2 text-left"
+          >
+            <span
+              className={`inline-block text-gray-500 transition-transform ${
+                linkingSectionOpen ? 'rotate-90' : ''
+              }`}
+              aria-hidden="true"
+            >
+              ▸
+            </span>
+            <h2 className="text-xl font-semibold text-gray-900">
+              Propojení rodičů{' '}
+              <span className="text-sm font-normal text-gray-500">
+                ({filteredPlayers.filter((p) => !p.parent_id).length} nepropojených ·{' '}
+                {filteredPlayers.filter((p) => !!p.parent_id).length} připojených)
+              </span>
+            </h2>
+          </button>
+          {linkingSectionOpen && (
+          <>
           <p className="mt-1 text-sm text-gray-600">
             Přepojení hráče je možné jen přes manažera: odpojit rodiče, potom vygenerovat nový
             kód.
@@ -1339,6 +1440,8 @@ export default function ManagerDashboard({
               );
             })}
           </div>
+          </>
+          )}
         </div>
 
         {/* Add Tournament */}
