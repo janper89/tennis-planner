@@ -24,6 +24,15 @@
 .DS_Store
 *.pem
 
+# editor / IDE
+/.vscode/
+/.idea/
+
+# user data exports (never commit – contain personal emails, etc.)
+*.xlsx
+*.xls
+*.csv
+
 # debug
 npm-debug.log*
 yarn-debug.log*
