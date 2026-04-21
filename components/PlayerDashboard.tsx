@@ -602,9 +602,15 @@ export default function PlayerDashboard({
                       }}
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="text-sm font-medium text-gray-700">Ruční zadání</span>
+                    <span className="text-sm font-medium text-gray-700">
+                      Ruční zadání (české turnaje, UTR, vlastní)
+                    </span>
                   </label>
                 </div>
+                <p className="mt-2 text-xs text-gray-600">
+                  Když turnaj není v ITF vyhledávání, můžeš ho ručně vypsat včetně data, místa,
+                  typu turnaje a popisu.
+                </p>
                 {searchError && (
                   <div className="mt-2 rounded-md bg-yellow-50 p-3 text-sm text-yellow-800">
                     {searchError}
@@ -712,12 +718,12 @@ export default function PlayerDashboard({
               {(!useAutoSearch || editingEntry || searchError) && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Kategorie *</label>
+                    <label className="block text-sm font-medium text-gray-700">Datum *</label>
                     <input
-                      type="text"
-                      name="kategorie"
+                      type="date"
+                      name="datum"
                       required={!useAutoSearch || !!searchError}
-                      defaultValue={editingEntry?.tournament.kategorie || ''}
+                      defaultValue={editingEntry?.tournament.datum ?? ''}
                       className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
                     />
                   </div>
@@ -728,16 +734,20 @@ export default function PlayerDashboard({
                       name="misto"
                       required={!useAutoSearch || !!searchError}
                       defaultValue={editingEntry?.tournament.misto || ''}
+                      placeholder="Např. Praha, Ostrava"
                       className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Datum *</label>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Typ turnaje *
+                    </label>
                     <input
-                      type="date"
-                      name="datum"
+                      type="text"
+                      name="kategorie"
                       required={!useAutoSearch || !!searchError}
-                      defaultValue={editingEntry?.tournament.datum ?? ''}
+                      defaultValue={editingEntry?.tournament.kategorie || ''}
+                      placeholder="Např. České turnaje, UTR, ITF, klubový"
                       className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
                     />
                   </div>
@@ -757,11 +767,12 @@ export default function PlayerDashboard({
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Poznámka</label>
+                <label className="block text-sm font-medium text-gray-700">Popis</label>
                 <textarea
                   name="poznamka"
                   rows={3}
                   defaultValue={editingEntry?.poznamka_rodic || ''}
+                  placeholder="Např. domácí turnaj, přihláška poslaná ručně, důležité info"
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
                 />
               </div>
@@ -850,7 +861,8 @@ export default function PlayerDashboard({
                             </div>
                             <div className="mt-2 grid grid-cols-2 gap-2 text-sm text-gray-600 md:grid-cols-4">
                               <div>
-                                <span className="font-medium">Kategorie:</span> {entry.tournament.kategorie}
+                                <span className="font-medium">Typ turnaje:</span>{' '}
+                                {entry.tournament.kategorie}
                               </div>
                               <div>
                                 <span className="font-medium">Místo:</span> {entry.tournament.misto}
@@ -877,7 +889,7 @@ export default function PlayerDashboard({
                             <TournamentFactsheetDetails tournament={entry.tournament} />
                             {entry.poznamka_rodic && (
                               <div className="mt-2 text-sm text-gray-600">
-                                <span className="font-medium">Poznámka:</span> {entry.poznamka_rodic}
+                                <span className="font-medium">Popis:</span> {entry.poznamka_rodic}
                               </div>
                             )}
                           </div>
