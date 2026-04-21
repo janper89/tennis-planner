@@ -35,6 +35,26 @@ type Coach = {
   email: string;
 };
 
+const PARENT_SELECTED_CHILD_STORAGE_PREFIX = 'tennis_club_parent_selected_player';
+
+function readPersistedSelectedChildId(scope: string | undefined): string | null {
+  if (typeof window === 'undefined' || !scope) return null;
+  try {
+    return sessionStorage.getItem(`${PARENT_SELECTED_CHILD_STORAGE_PREFIX}:${scope}`);
+  } catch {
+    return null;
+  }
+}
+
+function persistSelectedChildId(scope: string | undefined, playerId: string) {
+  if (typeof window === 'undefined' || !scope) return;
+  try {
+    sessionStorage.setItem(`${PARENT_SELECTED_CHILD_STORAGE_PREFIX}:${scope}`, playerId);
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
 interface ParentDashboardProps {
   players: Player[];
   entries: Entry[];
@@ -95,9 +115,20 @@ export default function ParentDashboard({
     setPlayers(initialPlayers);
     setEntries(initialEntries);
     setTournaments(initialTournaments);
-    setSelectedPlayer(initialPlayers[0] || null);
+    setSelectedPlayer((prev) => {
+      const scope = impersonatedParentId ?? userEmail;
+      const savedId = readPersistedSelectedChildId(scope);
+      if (savedId) {
+        const fromStorage = initialPlayers.find((p) => p.id === savedId);
+        if (fromStorage) return fromStorage;
+      }
+      if (prev && initialPlayers.some((p) => p.id === prev.id)) {
+        return prev;
+      }
+      return initialPlayers[0] || null;
+    });
     setNewName(userName);
-  }, [initialPlayers, initialEntries, initialTournaments, userName]);
+  }, [initialPlayers, initialEntries, initialTournaments, userName, impersonatedParentId]);
 
   // Reset add-child form preview when form is closed
   useEffect(() => {
@@ -1108,6 +1139,9 @@ export default function ParentDashboard({
               onChange={(e) => {
                 const player = players.find((p) => p.id === e.target.value);
                 setSelectedPlayer(player || null);
+                if (player) {
+                  persistSelectedChildId(impersonatedParentId ?? userEmail, player.id);
+                }
               }}
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
             >

@@ -30,6 +30,26 @@ type Entry = Database['public']['Tables']['entry']['Row'] & {
   player: Player;
 };
 
+const COACH_SELECTED_PLAYER_STORAGE_PREFIX = 'tennis_club_coach_selected_player';
+
+function readCoachPersistedPlayerId(scope: string | undefined): string | null {
+  if (typeof window === 'undefined' || !scope) return null;
+  try {
+    return sessionStorage.getItem(`${COACH_SELECTED_PLAYER_STORAGE_PREFIX}:${scope}`);
+  } catch {
+    return null;
+  }
+}
+
+function persistCoachSelectedPlayerId(scope: string | undefined, playerId: string) {
+  if (typeof window === 'undefined' || !scope) return;
+  try {
+    sessionStorage.setItem(`${COACH_SELECTED_PLAYER_STORAGE_PREFIX}:${scope}`, playerId);
+  } catch {
+    // ignore
+  }
+}
+
 interface CoachDashboardProps {
   players: Player[];
   entries: Entry[];
@@ -72,8 +92,18 @@ export default function CoachDashboard({
     setPlayers(initialPlayers);
     setEntries(initialEntries);
     setTournaments(initialTournaments);
-    setSelectedPlayer(initialPlayers[0] || null);
-  }, [initialPlayers, initialEntries, initialTournaments]);
+    setSelectedPlayer((prev) => {
+      const savedId = readCoachPersistedPlayerId(userEmail);
+      if (savedId) {
+        const fromStorage = initialPlayers.find((p) => p.id === savedId);
+        if (fromStorage) return fromStorage;
+      }
+      if (prev && initialPlayers.some((p) => p.id === prev.id)) {
+        return prev;
+      }
+      return initialPlayers[0] || null;
+    });
+  }, [initialPlayers, initialEntries, initialTournaments, userEmail]);
 
   // Reset add-player form preview when form is closed
   useEffect(() => {
@@ -838,6 +868,7 @@ export default function CoachDashboard({
               onChange={(e) => {
                 const player = players.find((p) => p.id === e.target.value);
                 setSelectedPlayer(player || null);
+                if (player) persistCoachSelectedPlayerId(userEmail, player.id);
               }}
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
             >
