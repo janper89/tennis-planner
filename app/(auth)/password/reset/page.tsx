@@ -78,7 +78,9 @@ function PasswordResetContent() {
     setLoading(true);
 
     try {
-      const redirectUrl = `${window.location.origin}/password/reset`;
+      const redirectUrl = process.env.NEXT_PUBLIC_SITE_URL
+        ? `${process.env.NEXT_PUBLIC_SITE_URL}/password/reset`
+        : `${window.location.origin}/password/reset`;
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         email.trim(),
         {
@@ -203,6 +205,9 @@ function PasswordResetContent() {
                 <p className="text-green-600">
                   Nepřišel? Zkontroluj <strong>spam</strong>. V Supabase Dashboard musí být v Authentication → URL Configuration → Redirect URLs adresa{' '}
                   <code className="rounded bg-green-100 px-1">{typeof window !== 'undefined' ? window.location.origin : ''}/password/reset</code>.
+                </p>
+                <p className="mt-2 text-green-700">
+                  Doručení může trvat několik minut. Zkontrolujte také složku spam. Pokud email nedorazí do 5 minut, kontaktujte nás.
                 </p>
               </div>
             )}
