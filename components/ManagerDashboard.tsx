@@ -795,7 +795,7 @@ export default function ManagerDashboard({
         <div
           className={canEdit ? 'border-b border-blue-200 bg-blue-100 px-4 py-3' : 'border-b border-amber-200 bg-amber-100 px-4 py-3'}
         >
-          <div className="mx-auto max-w-7xl flex items-center justify-between">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
             <p className={`text-sm font-medium ${canEdit ? 'text-blue-900' : 'text-amber-900'}`}>
               {canEdit
                 ? `Správa účtu: ${viewingAsParentData.parentName} — režim úprav`
@@ -806,7 +806,7 @@ export default function ManagerDashboard({
                 setViewingAsParentId(null);
                 setViewingAsParentData(null);
               }}
-              className={`rounded-md px-4 py-2 text-sm font-medium ${canEdit ? 'bg-blue-200 text-blue-900 hover:bg-blue-300' : 'bg-amber-200 text-amber-900 hover:bg-amber-300'}`}
+              className={`shrink-0 rounded-md px-4 py-2 text-sm font-medium ${canEdit ? 'bg-blue-200 text-blue-900 hover:bg-blue-300' : 'bg-amber-200 text-amber-900 hover:bg-amber-300'}`}
             >
               Ukončit zobrazení
             </button>
@@ -831,12 +831,20 @@ export default function ManagerDashboard({
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow">
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">
               Tenisový klub - Manažer
             </h1>
-            <div className="flex items-center gap-3">
+            <div className="flex shrink-0 flex-wrap items-center gap-3">
               {isAdmin && <RoleSwitcher />}
+              <Link
+                href="/trips"
+                className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                title="Výjezdy"
+              >
+                <span aria-hidden>🧳</span>
+                <span>Výjezdy</span>
+              </Link>
               <Link
                 href="/password"
                 className="rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
@@ -857,7 +865,7 @@ export default function ManagerDashboard({
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Parents Management Section */}
         <div className="mb-6 rounded-lg bg-white p-6 shadow">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl font-semibold text-gray-900">
               Správa rodičů
             </h2>
@@ -916,15 +924,15 @@ export default function ManagerDashboard({
                 {parents.map((parent) => (
                   <div
                     key={parent.id}
-                    className="flex items-center justify-between rounded-md border border-gray-200 p-3"
+                    className="flex flex-col gap-3 rounded-md border border-gray-200 p-3 sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <div>
-                      <p className="font-medium text-gray-900">{parent.email}</p>
+                    <div className="min-w-0">
+                      <p className="break-all font-medium text-gray-900">{parent.email}</p>
                       <p className="text-xs text-gray-500">
                         Přidáno: {new Date(parent.created_at).toLocaleDateString('cs-CZ')}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                       <button
                         onClick={() => loadParentViewData(parent.id, parent.email, parent.name)}
                         disabled={loadingParentViewId !== null}
@@ -999,7 +1007,7 @@ export default function ManagerDashboard({
 
         {/* Player accounts (self-service role) */}
         <div className="mb-6 rounded-lg bg-white p-6 shadow">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl font-semibold text-gray-900">
               Účty hráčů (self-service)
             </h2>
@@ -1057,17 +1065,17 @@ export default function ManagerDashboard({
                 {playerAccounts.map((account) => (
                   <div
                     key={account.id}
-                    className="flex items-center justify-between rounded-md border border-gray-200 p-3"
+                    className="flex flex-col gap-3 rounded-md border border-gray-200 p-3 sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <div>
-                      <p className="font-medium text-gray-900">{account.email}</p>
+                    <div className="min-w-0">
+                      <p className="break-all font-medium text-gray-900">{account.email}</p>
                       <p className="text-xs text-gray-500">
                         Přidáno: {new Date(account.created_at).toLocaleDateString('cs-CZ')}
                       </p>
                     </div>
                     <button
                       onClick={() => handleDeletePlayerAccount(account.id, account.email)}
-                      className="rounded-md bg-red-100 px-3 py-1 text-sm text-red-700 hover:bg-red-200"
+                      className="self-start rounded-md bg-red-100 px-3 py-1 text-sm text-red-700 hover:bg-red-200 sm:self-auto sm:shrink-0"
                     >
                       Smazat
                     </button>
@@ -1080,7 +1088,7 @@ export default function ManagerDashboard({
 
         {/* Add Player */}
         <div className="mb-6 rounded-lg bg-white p-6 shadow">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl font-semibold text-gray-900">Přidat hráče</h2>
             <button
               onClick={() => {

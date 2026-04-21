@@ -41,13 +41,13 @@ export default function RoleSwitcher() {
   };
 
   return (
-    <div className="flex items-center gap-2 rounded-md border border-gray-300 bg-white p-1">
+    <div className="flex flex-wrap items-center gap-1 rounded-md border border-gray-300 bg-white p-1 sm:gap-2">
       <span className="px-2 text-xs text-gray-600">Zobrazit jako:</span>
       {VALID_ROLES.map((role) => (
         <button
           key={role}
           onClick={() => handleRoleChange(role)}
-          className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+          className={`rounded px-2 py-1 text-xs font-medium transition-colors sm:px-3 ${
             viewRole === role
               ? 'bg-blue-600 text-white'
               : 'text-gray-700 hover:bg-gray-100'

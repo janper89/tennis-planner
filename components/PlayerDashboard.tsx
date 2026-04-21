@@ -427,13 +427,13 @@ export default function PlayerDashboard({
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow">
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">
                 Tenisový klub – Hráč
               </h1>
               {editingName ? (
-                <div className="mt-1 flex items-center gap-2">
+                <div className="mt-1 flex flex-wrap items-center gap-2">
                   <input
                     type="text"
                     value={newName}
@@ -460,7 +460,7 @@ export default function PlayerDashboard({
                   </button>
                 </div>
               ) : (
-                <div className="mt-1 flex items-center gap-2">
+                <div className="mt-1 flex flex-wrap items-center gap-2">
                   {userName?.trim() ? (
                     <>
                       <p className="text-sm font-medium text-gray-700">{userName}</p>
@@ -487,7 +487,15 @@ export default function PlayerDashboard({
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex shrink-0 flex-wrap items-center gap-3">
+              <Link
+                href="/trips"
+                className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                title="Výjezdy"
+              >
+                <span aria-hidden>🧳</span>
+                <span>Výjezdy</span>
+              </Link>
               <Link
                 href="/password"
                 className="rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
@@ -842,9 +850,9 @@ export default function PlayerDashboard({
                             : 'border-gray-200'
                         }`}
                       >
-                        <div className="flex items-start justify-between">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div className="flex-1">
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <h4 className="font-semibold">
                                 {formatTournamentName(entry.tournament.nazev)}
                               </h4>
@@ -893,7 +901,7 @@ export default function PlayerDashboard({
                               </div>
                             )}
                           </div>
-                          <div className="ml-4 flex flex-wrap gap-2">
+                          <div className="flex flex-wrap gap-2 sm:ml-4 sm:shrink-0">
                             {entry.status !== 'odehrano' && entry.status !== 'odhlasen' && (
                               <button
                                 type="button"
