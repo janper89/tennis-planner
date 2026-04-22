@@ -135,10 +135,13 @@ Aplikace poběží na [http://localhost:3000](http://localhost:3000)
 
 ### Automatické výpočty
 
-- `entry_deadline` = 10 dní před datem turnaje
-- `withdraw_deadline` = 2 dny před datem turnaje
+- `entry_deadline` – primárně parsovaný `sign_in_deadline_text` z ITF factsheetu,
+  fallback `datum - 10 dní`
+- `withdraw_deadline` – primárně parsovaný `withdrawal_deadline_text` z ITF factsheetu,
+  fallback `datum - 2 dny`
 
-Tyto hodnoty se počítají automaticky pomocí triggeru v databázi.
+Tyto hodnoty se počítají automaticky triggerem `calculate_tournament_deadlines`
+(viz `supabase/fix_tournament_deadline_logic_from_itf.sql`).
 
 ## Row Level Security (RLS)
 
@@ -189,6 +192,18 @@ Aplikace používá RLS pro zabezpečení dat:
 ### TypeScript chyby
 - Spusť `npm run build` pro kontrolu typů
 - Zkontroluj, že všechny importy jsou správné
+
+### Špatné datum turnaje / chybějící `Uzávěrka (ITF)`
+Pokud narazíš na jakýkoli turnaj s divným datumem (typicky 1. v měsíci) nebo
+kde v UI chybí blok `Uzávěrka (ITF)` / `Odhlášení (ITF)`, spusť:
+
+```bash
+npm run refresh-tournaments     # stáhne čerstvý ITF kalendář + factsheety
+npm run check-parent-sms-fix    # ověří, že deadliny a datumy v DB sedí
+```
+
+Obojí je bezpečné pouštět opakovaně. Detailní runbook a SQL dotazy jsou
+v [`docs/TROUBLESHOOTING-TURNAJE.md`](docs/TROUBLESHOOTING-TURNAJE.md).
 
 ## Licence
 
