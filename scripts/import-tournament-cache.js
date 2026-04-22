@@ -107,6 +107,11 @@ function normalizeDate(val) {
   return null;
 }
 
+function shouldPreferFirstDayMainDraw(startDate, firstDayMainDraw) {
+  if (!startDate || !firstDayMainDraw) return false;
+  return /^\d{4}-\d{2}-01$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(firstDayMainDraw);
+}
+
 function normalizeTournamentName(n) {
   if (!n || typeof n !== 'string') return n || '';
   const trimmed = String(n).trim();
@@ -235,7 +240,12 @@ function toCacheRow(item) {
   const cityRaw = (inferredCity || item.country || 'N/A').trim() || 'N/A';
   const city = cityRaw.replace(/\s*\(\s*(closed|cancel{1,2}ed)\s*\)\s*/gi, '').trim() || 'N/A';
   const startDateRaw = item.start_date ?? item.startDate ?? null;
-  const start_date = normalizeDate(startDateRaw) || startDateRaw;
+  const firstDayMainDraw =
+    normalizeDate(item.first_day_main_draw ?? item.firstDayMainDraw ?? null) || null;
+  let start_date = normalizeDate(startDateRaw) || startDateRaw;
+  if (shouldPreferFirstDayMainDraw(start_date, firstDayMainDraw)) {
+    start_date = firstDayMainDraw;
+  }
   const category = item.category ?? null;
 
   if (!tournament_key || !name || !start_date) {

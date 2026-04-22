@@ -1524,18 +1524,6 @@ export default function ParentDashboard({
                                   <span className="font-medium">Priorita:</span>{' '}
                                   P{entry.priority}
                                 </div>
-                                {entry.tournament.entry_deadline && (
-                                  <div>
-                                    <span className="font-medium">Uzávěrka:</span>{' '}
-                                    {formatDate(entry.tournament.entry_deadline)}
-                                  </div>
-                                )}
-                                {entry.tournament.withdraw_deadline && (
-                                  <div>
-                                    <span className="font-medium">Odhlášení do:</span>{' '}
-                                    {formatDate(entry.tournament.withdraw_deadline)}
-                                  </div>
-                                )}
                               </div>
                               <TournamentFactsheetDetails tournament={entry.tournament} />
                               {entry.poznamka_rodic && (

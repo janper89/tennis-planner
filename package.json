@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "import-cache": "node scripts/import-tournament-cache.js",
-    "refresh-tournaments": "./scripts/refresh-tournaments.sh"
+    "refresh-tournaments": "./scripts/refresh-tournaments.sh",
+    "check-parent-sms-fix": "node scripts/check-parent-sms-fix.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",

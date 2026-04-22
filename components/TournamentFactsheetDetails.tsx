@@ -18,8 +18,8 @@ export default function TournamentFactsheetDetails({
   className = '',
 }: TournamentFactsheetDetailsProps) {
   const rows: Array<{ label: string; value?: string | null }> = [
-    { label: 'Přihlášky', value: tournament.sign_in_deadline_text },
-    { label: 'Výběr', value: tournament.withdrawal_deadline_text },
+    { label: 'Uzávěrka (ITF)', value: tournament.sign_in_deadline_text },
+    { label: 'Odhlášení (ITF)', value: tournament.withdrawal_deadline_text },
     { label: 'Ředitel', value: tournament.tournament_director_name },
     { label: 'Míčky', value: tournament.official_ball },
     { label: 'Draw', value: tournament.draw_size },

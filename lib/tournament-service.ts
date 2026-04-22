@@ -19,6 +19,7 @@ type TournamentCacheRow = {
   draw_size?: string | null;
   entry_deadline?: string | null;
   withdrawal_deadline?: string | null;
+  first_day_main_draw?: string | null;
   tournament_director_name?: string | null;
   official_ball?: string | null;
   tournament_key_factsheet?: string | null;
@@ -50,11 +51,12 @@ function normalizeTournamentName(name: string): string {
 }
 
 function mapCacheRowToSearchResult(row: TournamentCacheRow): ITFTournamentSearchResult {
+  const resolvedStartDate = resolveCacheStartDate(row);
   return {
     tournamentKey: row.tournament_key,
     name: normalizeTournamentName(row.name),
     city: row.city,
-    startDate: row.start_date,
+    startDate: resolvedStartDate,
     category: row.category ?? undefined,
     country: row.country ?? undefined,
     venue: row.venue ?? undefined,
@@ -65,6 +67,43 @@ function mapCacheRowToSearchResult(row: TournamentCacheRow): ITFTournamentSearch
     tournamentDirectorName: row.tournament_director_name ?? undefined,
     officialBall: row.official_ball ?? undefined,
   };
+}
+
+function parseLooseDateToIso(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const s = value.trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  const dmy = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{2,4})$/);
+  if (dmy) {
+    const [, d, m, y] = dmy;
+    const year = y.length === 2 ? `20${y}` : y;
+    return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+
+  const monthNames: Record<string, string> = {
+    jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+    jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
+  };
+  const txt = s.match(/(\d{1,2})\s+([a-z]{3,9})[a-z]*,?\s+(20\d{2})/i);
+  if (txt) {
+    const [, d, mon, year] = txt;
+    const month = monthNames[mon.slice(0, 3).toLowerCase()];
+    if (month) return `${year}-${month}-${d.padStart(2, '0')}`;
+  }
+
+  return null;
+}
+
+function resolveCacheStartDate(row: TournamentCacheRow): string {
+  const fallback = row.start_date;
+  const firstDayMainDrawIso = parseLooseDateToIso(row.first_day_main_draw);
+  // Ochrana proti legacy fallbacku z kalendáře (01 v měsíci) – použij přesnější první den MD.
+  if (firstDayMainDrawIso && /^\d{4}-\d{2}-01$/.test(fallback)) {
+    return firstDayMainDrawIso;
+  }
+  return firstDayMainDrawIso || fallback;
 }
 
 function isCanonicalTournamentKey(key?: string | null): boolean {
@@ -364,7 +403,7 @@ export async function searchTournamentsByName(
     // Sloupce factsheetu zvyšují kvalitu řazení výsledků, ale cache zůstává použitelná i bez nich.
     const { data, error } = await supabase
       .from('tournament_cache')
-      .select('tournament_key, name, city, start_date, category, country, venue, end_date, draw_size, entry_deadline, withdrawal_deadline, tournament_director_name, official_ball, tournament_key_factsheet')
+      .select('tournament_key, name, city, start_date, category, country, venue, end_date, draw_size, entry_deadline, withdrawal_deadline, first_day_main_draw, tournament_director_name, official_ball, tournament_key_factsheet')
       .or(`name.ilike.%${query}%,city.ilike.%${query}%`)
       .order('start_date', { ascending: true })
       .limit(Math.max(limit * 4, 80));
