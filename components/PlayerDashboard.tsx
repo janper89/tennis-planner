@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import {
   formatDate,
   formatTournamentName,
+  formatCompactTournamentLabel,
   formatCategory,
   getWeekNumber,
   getWeekRange,
@@ -22,7 +23,6 @@ import {
 } from '@/lib/tournament-service';
 import { adjustManualPlayedAdjustment } from '@/lib/manual-played-adjustment';
 import TournamentNameInput from '@/components/TournamentNameInput';
-import TournamentFactsheetDetails from '@/components/TournamentFactsheetDetails';
 
 type Player = Database['public']['Tables']['player']['Row'];
 type Tournament = Database['public']['Tables']['tournament']['Row'];
@@ -80,12 +80,14 @@ export default function PlayerDashboard({
     }
   }, [showForm, editingEntry]);
 
-  const entriesByWeek = entries.reduce((acc, entry) => {
-    const weekNum = getWeekNumber(entry.tournament.datum);
-    if (!acc[weekNum]) acc[weekNum] = [];
-    acc[weekNum].push(entry);
-    return acc;
-  }, {} as Record<number, Entry[]>);
+  const entriesByWeek = entries
+    .filter((e) => e.status !== 'odhlasen')
+    .reduce((acc, entry) => {
+      const weekNum = getWeekNumber(entry.tournament.datum);
+      if (!acc[weekNum]) acc[weekNum] = [];
+      acc[weekNum].push(entry);
+      return acc;
+    }, {} as Record<number, Entry[]>);
 
   const getEntryPlayedCount = (playerId: string) =>
     entries.filter((e) => e.player_id === playerId && e.status === 'odehrano').length;
@@ -696,28 +698,21 @@ export default function PlayerDashboard({
                     {searchResults.map((r) => (
                       <label
                         key={r.tournamentKey}
-                        className="flex cursor-pointer flex-col gap-0.5 rounded border border-gray-200 bg-white px-3 py-2 hover:bg-gray-50"
+                        className="flex cursor-pointer items-start gap-2 rounded border border-gray-200 bg-white px-3 py-2 hover:bg-gray-50"
                       >
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="radio"
-                            name="selectedTournamentKey"
-                            value={r.tournamentKey}
-                            required
-                            className="h-4 w-4 shrink-0 text-blue-600 focus:ring-blue-500"
-                          />
-                          <span className="text-sm text-gray-800">
-                            {r.name} – {r.city} – {formatDate(r.startDate)}
-                            {r.category ? ` (${r.category})` : ''}
+                        <input
+                          type="radio"
+                          name="selectedTournamentKey"
+                          value={r.tournamentKey}
+                          required
+                          className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-800">
+                          <span className="font-medium">
+                            {formatCompactTournamentLabel(r.category, r.city, r.name)}
                           </span>
-                        </div>
-                        {(r.entryDeadline || r.drawSize) && (
-                          <div className="ml-6 text-xs text-gray-500">
-                            {r.entryDeadline && <span>Přihlášky: {r.entryDeadline}</span>}
-                            {r.entryDeadline && r.drawSize && ' · '}
-                            {r.drawSize && <span>Draw: {r.drawSize}</span>}
-                          </div>
-                        )}
+                          <span className="text-gray-500"> · {formatDate(r.startDate)}</span>
+                        </span>
                       </label>
                     ))}
                   </div>
@@ -854,7 +849,11 @@ export default function PlayerDashboard({
                           <div className="flex-1">
                             <div className="flex flex-wrap items-center gap-2">
                               <h4 className="font-semibold">
-                                {formatTournamentName(entry.tournament.nazev)}
+                                {formatCompactTournamentLabel(
+                                  entry.tournament.kategorie,
+                                  entry.tournament.misto,
+                                  entry.tournament.nazev
+                                )}
                               </h4>
                               {entry.status === 'odehrano' && (
                                 <span className="rounded bg-green-600 px-2 py-0.5 text-xs font-medium text-white">
@@ -867,26 +866,13 @@ export default function PlayerDashboard({
                                 </span>
                               )}
                             </div>
-                            <div className="mt-2 grid grid-cols-2 gap-2 text-sm text-gray-600 md:grid-cols-4">
-                              <div>
-                                <span className="font-medium">Typ turnaje:</span>{' '}
-                                {entry.tournament.kategorie}
-                              </div>
-                              <div>
-                                <span className="font-medium">Místo:</span> {entry.tournament.misto}
-                              </div>
-                              <div>
-                                <span className="font-medium">Datum:</span> {formatDate(entry.tournament.datum)}
-                              </div>
-                              <div>
-                                <span className="font-medium">Priorita:</span> P{entry.priority}
-                              </div>
-                            </div>
-                            <TournamentFactsheetDetails tournament={entry.tournament} />
+                            <p className="mt-1 text-sm text-gray-600">
+                              {formatDate(entry.tournament.datum)} · Priorita P{entry.priority}
+                            </p>
                             {entry.poznamka_rodic && (
-                              <div className="mt-2 text-sm text-gray-600">
+                              <p className="mt-2 text-sm text-gray-600">
                                 <span className="font-medium">Popis:</span> {entry.poznamka_rodic}
-                              </div>
+                              </p>
                             )}
                           </div>
                           <div className="flex flex-wrap gap-2 sm:ml-4 sm:shrink-0">

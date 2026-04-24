@@ -6,11 +6,13 @@ import { createClient } from '@/lib/supabase/client';
 import {
   formatDate,
   formatTournamentName,
+  formatCompactTournamentLabel,
   formatCategory,
   getWeekNumber,
   getWeekRange,
   getAgeFromBirthDate,
   getMaxTournamentsForAge,
+  isActiveEntry,
 } from '@/lib/utils';
 import type { Database } from '@/types/database';
 import {
@@ -21,7 +23,6 @@ import {
 } from '@/lib/tournament-service';
 import { adjustManualPlayedAdjustment } from '@/lib/manual-played-adjustment';
 import TournamentNameInput from '@/components/TournamentNameInput';
-import TournamentFactsheetDetails from '@/components/TournamentFactsheetDetails';
 
 type Player = Database['public']['Tables']['player']['Row'];
 type Tournament = Database['public']['Tables']['tournament']['Row'];
@@ -136,9 +137,9 @@ export default function CoachDashboard({
     return acc;
   }, {} as Record<string, Entry[]>);
 
-  // Group entries by week for selected player
+  // Group entries by week for selected player (legacy odhlasen záznamy skrýváme – v minimal modu se neřeší).
   const playerEntries = entries.filter(
-    (e) => e.player_id === selectedPlayer?.id
+    (e) => e.player_id === selectedPlayer?.id && e.status !== 'odhlasen'
   );
   const entriesByWeek = playerEntries.reduce((acc, entry) => {
     const weekNum = getWeekNumber(entry.tournament.datum);
@@ -478,60 +479,6 @@ export default function CoachDashboard({
 
       // Refresh data
       window.location.reload();
-    } catch (error) {
-      console.error('Error:', error);
-      alert('Došlo k chybě');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUnregisterEntry = async (entryId: string) => {
-    if (!confirm('Opravdu chceš odhlásit tuto přihlášku?')) return;
-
-    setLoading(true);
-    try {
-      const { error } = await supabase
-        .from('entry')
-        .update({ status: 'odhlasen' })
-        .eq('id', entryId);
-
-      if (error) {
-        alert('Chyba při odhlašování: ' + error.message);
-        return;
-      }
-
-      setEntries(
-        entries.map((e) =>
-          e.id === entryId ? { ...e, status: 'odhlasen' as const } : e
-        )
-      );
-    } catch (error) {
-      console.error('Error:', error);
-      alert('Došlo k chybě');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRestoreEntry = async (entryId: string) => {
-    setLoading(true);
-    try {
-      const { error } = await supabase
-        .from('entry')
-        .update({ status: 'planovano' })
-        .eq('id', entryId);
-
-      if (error) {
-        alert('Chyba při obnovení: ' + error.message);
-        return;
-      }
-
-      setEntries(
-        entries.map((e) =>
-          e.id === entryId ? { ...e, status: 'planovano' as const } : e
-        )
-      );
     } catch (error) {
       console.error('Error:', error);
       alert('Došlo k chybě');
@@ -973,29 +920,20 @@ export default function CoachDashboard({
                     {searchResults.map((r) => (
                       <label
                         key={r.tournamentKey}
-                        className="flex cursor-pointer flex-col gap-0.5 rounded border border-gray-200 bg-white px-3 py-2 hover:bg-gray-50"
+                        className="flex cursor-pointer items-start gap-2 rounded border border-gray-200 bg-white px-3 py-2 hover:bg-gray-50"
                       >
-                        <div className="flex items-start gap-2">
-                          <input
-                            type="radio"
-                            name="selectedTournamentKey"
-                            value={r.tournamentKey}
-                            className="mt-1"
-                          />
-                          <span className="text-sm">
-                            <span className="font-medium">{r.name}</span>
-                            <br />
-                            {r.city} • {formatDate(r.startDate)}
-                            {r.category && ` • ${r.category}`}
+                        <input
+                          type="radio"
+                          name="selectedTournamentKey"
+                          value={r.tournamentKey}
+                          className="mt-1"
+                        />
+                        <span className="text-sm">
+                          <span className="font-medium">
+                            {formatCompactTournamentLabel(r.category, r.city, r.name)}
                           </span>
-                        </div>
-                        {(r.entryDeadline || r.drawSize) && (
-                          <div className="ml-6 text-xs text-gray-500">
-                            {r.entryDeadline && <span>Přihlášky: {r.entryDeadline}</span>}
-                            {r.entryDeadline && r.drawSize && ' · '}
-                            {r.drawSize && <span>Draw: {r.drawSize}</span>}
-                          </div>
-                        )}
+                          <span className="text-gray-500"> · {formatDate(r.startDate)}</span>
+                        </span>
                       </label>
                     ))}
                   </div>
@@ -1126,64 +1064,35 @@ export default function CoachDashboard({
                   return (
                     <tr key={tournament.id} className="hover:bg-gray-50">
                       <td className="sticky left-0 z-10 whitespace-nowrap bg-white px-4 py-3 text-sm">
-                        <div className="font-medium">{formatTournamentName(tournament.nazev)}</div>
+                        <div className="font-medium">
+                          {formatCompactTournamentLabel(
+                            tournament.kategorie,
+                            tournament.misto,
+                            tournament.nazev
+                          )}
+                        </div>
                         <div className="text-xs text-gray-500">
-                          {formatDate(tournament.datum)} • {tournament.misto}
+                          {formatDate(tournament.datum)}
                         </div>
                       </td>
                       {players.map((player) => {
                         const entry = tournamentEntries.find(
                           (e) => e.player_id === player.id
                         );
+                        const isPlaying = entry && isActiveEntry(entry.status);
                         return (
                           <td
                             key={player.id}
                             className="px-4 py-3 text-center text-sm"
                           >
-                            {entry ? (
-                              <div
-                                className={`inline-block rounded-md px-2 py-1 ${
-                                  entry.status === 'odhlasen'
-                                    ? 'bg-gray-100'
-                                    : 'bg-blue-50'
-                                }`}
-                              >
-                                <div
-                                  className={`text-xs font-medium ${
-                                    entry.status === 'odhlasen'
-                                      ? 'text-gray-600'
-                                      : 'text-blue-900'
-                                  }`}
-                                >
-                                  {entry.tournament.misto}
-                                </div>
-                                <div
-                                  className={`text-xs ${
-                                    entry.status === 'odhlasen'
-                                      ? 'text-gray-500'
-                                      : 'text-blue-700'
-                                  }`}
-                                >
-                                  {entry.tournament.kategorie}
-                                </div>
-                                <div
-                                  className={`text-xs font-semibold ${
-                                    entry.status === 'odhlasen'
-                                      ? 'text-gray-600'
-                                      : 'text-blue-900'
-                                  }`}
-                                >
-                                  P{entry.priority}
-                                </div>
-                                {entry.status === 'odehrano' && (
-                                  <div className="mt-1 text-xs text-green-600">
-                                    Odehráno
-                                  </div>
-                                )}
-                                {entry.status === 'odhlasen' && (
-                                  <div className="mt-1 text-xs text-gray-500">
-                                    Odhlášeno
-                                  </div>
+                            {isPlaying ? (
+                              <div className="inline-flex flex-col items-center gap-0.5 rounded-md bg-blue-50 px-2 py-1">
+                                <span className="text-base font-semibold text-blue-900">✓</span>
+                                <span className="text-[10px] font-semibold text-blue-900">
+                                  P{entry!.priority}
+                                </span>
+                                {entry!.status === 'odehrano' && (
+                                  <span className="text-[10px] text-green-700">Odehráno</span>
                                 )}
                               </div>
                             ) : (
@@ -1316,24 +1225,16 @@ export default function CoachDashboard({
                             <div className="flex flex-col gap-3 rounded-md bg-gray-50 p-3 sm:flex-row sm:items-center sm:justify-between">
                               <div className="min-w-0">
                                 <p className="font-medium">
-                                  {formatTournamentName(entry.tournament.nazev)}
+                                  {formatCompactTournamentLabel(
+                                    entry.tournament.kategorie,
+                                    entry.tournament.misto,
+                                    entry.tournament.nazev
+                                  )}
                                 </p>
                                 <p className="text-sm text-gray-600">
-                                  {formatDate(entry.tournament.datum)} •{' '}
-                                  {entry.tournament.misto} •{' '}
-                                  {entry.tournament.kategorie}
-                                </p>
-                                <p className="text-sm">
-                                  Priorita: P{entry.priority}
+                                  {formatDate(entry.tournament.datum)} • Priorita P{entry.priority}
                                   {entry.status === 'odehrano' && (
-                                    <span className="ml-2 text-green-600">
-                                      (Odehráno)
-                                    </span>
-                                  )}
-                                  {entry.status === 'odhlasen' && (
-                                    <span className="ml-2 rounded bg-gray-200 px-1.5 py-0.5 text-xs font-medium text-gray-600">
-                                      Odhlášeno
-                                    </span>
+                                    <span className="ml-2 text-green-600">(Odehráno)</span>
                                   )}
                                   {needsPlayedConfirmation(entry) && (
                                     <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700">
@@ -1341,7 +1242,6 @@ export default function CoachDashboard({
                                     </span>
                                   )}
                                 </p>
-                                <TournamentFactsheetDetails tournament={entry.tournament} />
                               </div>
                               <div className="flex flex-wrap gap-2 sm:shrink-0">
                                 <button
@@ -1351,7 +1251,7 @@ export default function CoachDashboard({
                                 >
                                   Upravit
                                 </button>
-                                {entry.status !== 'odehrano' && entry.status !== 'odhlasen' && (
+                                {entry.status !== 'odehrano' && (
                                   <button
                                     onClick={() => handleMarkAsPlayed(entry.id)}
                                     disabled={loading}
@@ -1368,25 +1268,6 @@ export default function CoachDashboard({
                                   >
                                     Zrušit odehráno
                                   </button>
-                                )}
-                                {entry.status === 'odhlasen' ? (
-                                  <button
-                                    onClick={() => handleRestoreEntry(entry.id)}
-                                    disabled={loading}
-                                    className="rounded-md bg-blue-100 px-3 py-1 text-sm text-blue-700 hover:bg-blue-200 disabled:opacity-50"
-                                  >
-                                    Obnovit
-                                  </button>
-                                ) : (
-                                  entry.status !== 'odehrano' && (
-                                    <button
-                                      onClick={() => handleUnregisterEntry(entry.id)}
-                                      disabled={loading}
-                                      className="rounded-md bg-orange-100 px-3 py-1 text-sm text-orange-700 hover:bg-orange-200 disabled:opacity-50"
-                                    >
-                                      Odhlásit
-                                    </button>
-                                  )
                                 )}
                                 <button
                                   onClick={() => handleDeleteEntry(entry.id)}

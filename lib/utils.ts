@@ -66,3 +66,48 @@ export function getMaxTournamentsForAge(age: number): number {
   return 25; // 16+
 }
 
+export function formatShortPlayerName(name: string | null | undefined): string {
+  if (!name) return '';
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return parts[0];
+
+  const lastName = parts[parts.length - 1];
+  const initials = parts
+    .slice(0, -1)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('.');
+
+  return `${initials}.${lastName}`;
+}
+
+export function formatCompactTournamentLabel(
+  category: string | null | undefined,
+  city: string | null | undefined,
+  fallbackName?: string | null
+): string {
+  const trimmedCategory = category?.trim() ?? '';
+  const trimmedCity = city?.trim() ?? '';
+  const countryMatch = fallbackName?.match(/\(([A-Z]{3})\)/);
+  const country = countryMatch?.[0] ?? '';
+
+  const pieces = [trimmedCategory, trimmedCity].filter(Boolean);
+  if (pieces.length === 0) {
+    return formatTournamentName(fallbackName ?? '');
+  }
+  return `${pieces.join(' ')}${country ? ` ${country}` : ''}`.trim();
+}
+
+/**
+ * Active entry = přihláška, která se fakticky hraje nebo už odehrála.
+ * Používá se napříč UI v "minimal tournament mode" pro ✓ a filtraci.
+ */
+export function isActiveEntry(
+  status: string | null | undefined
+): boolean {
+  return status === 'planovano' || status === 'odehrano';
+}
+

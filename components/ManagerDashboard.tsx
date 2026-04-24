@@ -5,11 +5,13 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import {
   formatDate,
-  formatTournamentName,
-  formatCategory,
+  formatCompactTournamentLabel,
+  formatShortPlayerName,
   getWeekNumber,
+  getWeekRange,
   getAgeFromBirthDate,
   getMaxTournamentsForAge,
+  isActiveEntry,
 } from '@/lib/utils';
 import { ADMIN_EMAILS, ADMIN_EDIT_EMAILS } from '@/lib/config';
 import RoleSwitcher from '@/components/RoleSwitcher';
@@ -576,6 +578,15 @@ export default function ManagerDashboard({
           const week = getWeekNumber(t.datum);
           return week.toString() === selectedWeek;
         });
+
+  const tournamentsByWeek = filteredTournaments.reduce((acc, tournament) => {
+    const weekNumber = getWeekNumber(tournament.datum);
+    if (!acc[weekNumber]) {
+      acc[weekNumber] = [];
+    }
+    acc[weekNumber].push(tournament);
+    return acc;
+  }, {} as Record<number, Tournament[]>);
 
   // Create a map of player_id -> entries
   const entriesByPlayer = entries.reduce((acc, entry) => {
@@ -1310,6 +1321,16 @@ export default function ManagerDashboard({
           </div>
         </div>
 
+        <div className="mb-6 flex justify-end print:hidden">
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="rounded-md bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-900"
+          >
+            Tisk / PDF
+          </button>
+        </div>
+
         <div className="mb-6 rounded-lg bg-white p-6 shadow">
           <button
             type="button"
@@ -1541,7 +1562,7 @@ export default function ManagerDashboard({
         </div>
 
         {/* Matrix View – scroll uvnitř kontejneru, aby sticky hlavička (jména sloupců) fungovala */}
-        <div className="max-h-[70vh] overflow-auto rounded-lg bg-white shadow">
+        <div className="max-h-[70vh] overflow-auto rounded-lg bg-white shadow print:hidden">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -1591,62 +1612,49 @@ export default function ManagerDashboard({
                 return (
                   <tr key={tournament.id} className="hover:bg-gray-50">
                     <td className="sticky left-0 z-10 bg-white px-4 py-3 text-sm">
-                      <div className="font-medium">{formatTournamentName(tournament.nazev)}</div>
-                      <div className="text-xs text-gray-500">
-                        {formatDate(tournament.datum)} • {tournament.misto}
+                      <div className="font-medium">
+                        {formatCompactTournamentLabel(
+                          tournament.kategorie,
+                          tournament.misto,
+                          tournament.nazev
+                        )}
                       </div>
-                      {(tournament.draw_size || tournament.official_ball) && (
-                        <div className="mt-1 text-xs text-gray-400">
-                          {tournament.draw_size && <span>Draw: {tournament.draw_size}</span>}
-                          {tournament.draw_size && tournament.official_ball && ' · '}
-                          {tournament.official_ball && <span>Míček: {tournament.official_ball}</span>}
-                        </div>
-                      )}
+                      <div className="text-xs text-gray-500">
+                        {formatDate(tournament.datum)}
+                      </div>
                     </td>
                     {filteredPlayers.map((player) => {
                       const entry = tournamentEntries.find(
                         (e) => e.player_id === player.id
                       );
+                      const isPlaying = entry && isActiveEntry(entry.status);
                       return (
                         <td
                           key={player.id}
                           className="px-4 py-3 text-center text-sm"
                         >
-                          {entry ? (
-                            <div className="inline-block rounded-md bg-blue-50 px-2 py-1">
-                              <div className="text-xs font-medium text-blue-900">
-                                {entry.tournament.misto}
-                              </div>
-                              <div className="text-xs text-blue-700">
-                                {entry.tournament.kategorie}
-                              </div>
-                              <div className="text-xs font-semibold text-blue-900">
-                                P{entry.priority}
-                              </div>
-                              {entry.status === 'odehrano' && (
-                                <div className="mt-1 text-xs text-green-700">Odehráno</div>
-                              )}
-                              {entry.status !== 'odhlasen' && (
-                                <div className="mt-1 flex justify-center gap-1">
-                                  {entry.status !== 'odehrano' && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleMarkAsPlayed(entry.id)}
-                                      className="rounded bg-green-100 px-1.5 py-0.5 text-[10px] text-green-700 hover:bg-green-200"
-                                    >
-                                      Odehráno
-                                    </button>
-                                  )}
-                                  {entry.status === 'odehrano' && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleUnmarkAsPlayed(entry.id)}
-                                      className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-800 hover:bg-amber-100"
-                                    >
-                                      Zrušit
-                                    </button>
-                                  )}
-                                </div>
+                          {isPlaying ? (
+                            <div className="inline-flex flex-col items-center gap-1 rounded-md bg-blue-50 px-2 py-1">
+                              <span className="text-base font-semibold text-blue-900">✓</span>
+                              <span className="text-[10px] font-semibold text-blue-900">
+                                P{entry!.priority}
+                              </span>
+                              {entry!.status === 'odehrano' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUnmarkAsPlayed(entry!.id)}
+                                  className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-800 hover:bg-amber-100"
+                                >
+                                  Zrušit odehráno
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleMarkAsPlayed(entry!.id)}
+                                  className="rounded bg-green-100 px-1.5 py-0.5 text-[10px] text-green-700 hover:bg-green-200"
+                                >
+                                  Odehráno
+                                </button>
                               )}
                             </div>
                           ) : (
@@ -1670,6 +1678,76 @@ export default function ManagerDashboard({
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="hidden print:block print-matrix">
+          {Object.entries(tournamentsByWeek)
+            .sort(([a], [b]) => Number(a) - Number(b))
+            .map(([weekNumber, weekTournaments]) => {
+              if (!weekTournaments.length) return null;
+              const weekRange = getWeekRange(weekTournaments[0].datum);
+
+              return (
+                <section
+                  key={weekNumber}
+                  className="print-week-section mb-4"
+                >
+                  <h2 className="mb-2 font-bold">
+                    Týden {weekNumber} ({formatDate(weekRange.start)} - {formatDate(weekRange.end)})
+                  </h2>
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr>
+                        <th className="w-[64px] border border-black px-1 py-0.5 text-left">
+                          Datum
+                        </th>
+                        <th className="border border-black px-1 py-0.5 text-left">
+                          Turnaj
+                        </th>
+                        {filteredPlayers.map((player) => (
+                          <th
+                            key={player.id}
+                            className="border border-black px-1 py-0.5 text-center"
+                          >
+                            {formatShortPlayerName(player.name)}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {weekTournaments
+                        .sort((a, b) => new Date(a.datum).getTime() - new Date(b.datum).getTime())
+                        .map((tournament) => {
+                          const tournamentEntries = entriesByTournament[tournament.id] || [];
+                          return (
+                            <tr key={tournament.id} className="print-row-avoid-break">
+                              <td className="border border-black px-1 py-0.5 whitespace-nowrap">
+                                {formatDate(tournament.datum)}
+                              </td>
+                              <td className="border border-black px-1 py-0.5">
+                                {formatCompactTournamentLabel(tournament.kategorie, tournament.misto, tournament.nazev)}
+                              </td>
+                              {filteredPlayers.map((player) => {
+                                const entry = tournamentEntries.find((e) => e.player_id === player.id);
+                                const isPlaying =
+                                  entry && (entry.status === 'planovano' || entry.status === 'odehrano');
+                                return (
+                                  <td
+                                    key={player.id}
+                                    className="border border-black px-1 py-0.5 text-center font-semibold"
+                                  >
+                                    {isPlaying ? '✓' : ''}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </section>
+              );
+            })}
         </div>
 
         {/* Summary Stats */}
