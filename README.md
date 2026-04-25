@@ -205,6 +205,49 @@ npm run check-parent-sms-fix    # ověří, že deadliny a datumy v DB sedí
 Obojí je bezpečné pouštět opakovaně. Detailní runbook a SQL dotazy jsou
 v [`docs/TROUBLESHOOTING-TURNAJE.md`](docs/TROUBLESHOOTING-TURNAJE.md).
 
+## Destructive operations
+
+By default, `scripts/import-tournament-cache.js` is non-destructive: it only
+upserts (`onConflict: tournament_key`). No rows are ever deleted automatically.
+Both the GitHub Actions cron (`.github/workflows/update-tournament-cache.yml`)
+and the manual wrapper (`scripts/refresh-tournaments.sh`) run in this safe
+upsert-only mode. This guarantees that an incomplete scrape can never silently
+drop tournaments from `tournament_cache`.
+
+To enable **window-diff cleanup** (delete DB rows that fall inside the active
+time window but are missing from the current batch), pass `--cleanup`
+explicitly. Requires a window (`--from-today` and/or `--window-months=N`).
+Cleanup is skipped automatically if any upsert batch fails.
+
+To **wipe and reload the entire table**, pass `--replace-all`. This is guarded
+by a sanity check that refuses to delete when the new batch is less than 50 %
+of current DB size. Override with `--force-replace` only for intentional
+migrations or schema changes.
+
+Additionally, an import with a window set is rejected if the filtered batch
+contains fewer than 20 rows — a strong indicator of an incomplete scrape.
+Override with `--skip-min-rows-check` if the small batch is expected.
+
+Examples:
+
+```bash
+# Safe default: upsert only, no deletes.
+node scripts/import-tournament-cache.js data/tournament-cache.json \
+    --from-today --window-months=4
+
+# Opt-in window-diff cleanup (deletes orphans inside the window).
+node scripts/import-tournament-cache.js data/tournament-cache.json \
+    --from-today --window-months=4 --cleanup
+
+# Full wipe + reload (guarded by 50 % sanity check).
+node scripts/import-tournament-cache.js data/tournament-cache.json \
+    --replace-all
+
+# Full wipe + reload with sanity check bypassed (only for intentional migrations).
+node scripts/import-tournament-cache.js data/tournament-cache.json \
+    --replace-all --force-replace
+```
+
 ## Licence
 
 Tento projekt je vytvořen pro interní použití tenisového klubu.

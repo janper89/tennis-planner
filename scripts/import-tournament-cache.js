@@ -1,16 +1,30 @@
 /**
  * Bulk import tournament cache from a JSON file into Supabase tournament_cache table.
  *
+ * Default behavior is non-destructive: rows are only upserted (onConflict tournament_key).
+ * No rows are ever deleted unless you explicitly opt in via --cleanup or --replace-all.
+ *
  * Usage:
  *   node scripts/import-tournament-cache.js [path/to/file.json]
- *   node scripts/import-tournament-cache.js [path/to/file.json] --from-today --window-months=18 --replace-all
+ *   node scripts/import-tournament-cache.js [path/to/file.json] --from-today --window-months=18
+ *   node scripts/import-tournament-cache.js [path/to/file.json] --from-today --window-months=18 --cleanup
+ *   node scripts/import-tournament-cache.js [path/to/file.json] --replace-all [--force-replace]
  *
  * Default file: data/tournament-cache.json
  *
  * Flags:
- *   --from-today       keep only rows with start_date >= today
- *   --window-months=N  keep only rows in [today, today+N months), default CACHE_WINDOW_MONTHS_SEARCH or 18
- *   --replace-all      delete existing tournament_cache rows before upsert
+ *   --from-today              keep only rows with start_date >= today
+ *   --window-months=N         keep only rows in [today, today+N months), default CACHE_WINDOW_MONTHS_SEARCH or 18
+ *   --cleanup                 OPT-IN: after upsert, delete DB rows inside the time window that
+ *                             are not present in the current batch (window-diff cleanup).
+ *                             Requires a window (--from-today or --window-months).
+ *                             Skipped automatically if --replace-all is used or if any upsert failed.
+ *   --replace-all             DESTRUCTIVE: delete ALL existing tournament_cache rows before upsert.
+ *                             Guarded by a 50% safety check against current DB size.
+ *   --force-replace           Disable the --replace-all 50% safety check (use only for intentional
+ *                             migrations / wipes).
+ *   --skip-min-rows-check     Disable the minimum-rows hard gate (allow imports with < 20 rows
+ *                             when a window is set).
  *
  * Env (in .env.local or shell):
  *   NEXT_PUBLIC_SUPABASE_URL=...
@@ -32,11 +46,18 @@ const path = require('path');
 const args = process.argv.slice(2);
 
 const replaceAll = args.includes('--replace-all');
+const forceReplace = args.includes('--force-replace');
+const cleanupOptIn = args.includes('--cleanup');
+const skipMinRowsCheck = args.includes('--skip-min-rows-check');
 const fromToday = args.includes('--from-today');
 const windowMonthsArg = args.find((a) => a.startsWith('--window-months='));
 const windowMonths = windowMonthsArg ? parseInt(windowMonthsArg.split('=')[1], 10) : null;
 const fileArg = args.find((a) => !a.startsWith('--'));
 const overridesPath = path.join(process.cwd(), 'data', 'tournament-cache-overrides.json');
+
+// Safety thresholds. Kept as constants so the intent is visible at one spot.
+const MIN_ROWS_WITH_WINDOW = 20;
+const REPLACE_ALL_MIN_RATIO = 0.5;
 
 // Načtení .env.local z kořene projektu (cesta vůči umístění skriptu)
 const envPath = path.resolve(__dirname, '..', '.env.local');
@@ -454,6 +475,19 @@ async function main() {
     process.exit(1);
   }
 
+  // Minimum-rows hard gate. When a window is set and the batch is suspiciously small,
+  // refuse to touch the DB. 20 is a conservative floor — real 4-month junior calendar
+  // normally contains 300+ tournaments; anything below 20 is almost certainly an
+  // incomplete scrape.
+  if (cleanupWindow && rows.length < MIN_ROWS_WITH_WINDOW && !skipMinRowsCheck) {
+    console.error(
+      `MIN ROWS CHECK FAILED: only ${rows.length} rows after filtering, threshold is ${MIN_ROWS_WITH_WINDOW}.`
+    );
+    console.error('This usually indicates an incomplete scrape. Refusing to import.');
+    console.error('If this is intentional, re-run with --skip-min-rows-check.');
+    process.exit(1);
+  }
+
   console.log('Quality summary (ready to import):', buildQualitySummary(rows));
 
   const supabase = createClient(url, serviceKey);
@@ -462,6 +496,36 @@ async function main() {
   let err = 0;
 
   if (replaceAll) {
+    // Sanity guard: before wiping the whole table, make sure the new batch is not
+    // drastically smaller than what's currently in the DB. Protects against silent
+    // data loss when a scraper returns an incomplete payload.
+    if (!forceReplace) {
+      const { count: currentDbCount, error: countError } = await supabase
+        .from('tournament_cache')
+        .select('tournament_key', { count: 'exact', head: true });
+      if (countError) {
+        console.error('REPLACE-ALL SAFETY CHECK FAILED: unable to read current DB count:', countError.message);
+        console.error('Refusing to replace. If this is intentional, re-run with --force-replace.');
+        process.exit(1);
+      }
+      const dbCount = currentDbCount || 0;
+      if (dbCount > 0 && rows.length < REPLACE_ALL_MIN_RATIO * dbCount) {
+        console.error(
+          `REPLACE-ALL SAFETY CHECK FAILED: new batch has ${rows.length} rows, DB has ${dbCount} rows.`
+        );
+        console.error(
+          `New batch is less than ${Math.round(REPLACE_ALL_MIN_RATIO * 100)}% of current DB size. Refusing to replace.`
+        );
+        console.error('If this is intentional, re-run with --force-replace.');
+        process.exit(1);
+      }
+      console.log(
+        `REPLACE-ALL safety check OK: new batch ${rows.length} rows, DB ${dbCount} rows.`
+      );
+    } else {
+      console.log('REPLACE-ALL safety check: BYPASSED (--force-replace).');
+    }
+
     console.log('Mažu existující data v tournament_cache (--replace-all)...');
     const { error: deleteError } = await supabase
       .from('tournament_cache')
@@ -489,12 +553,19 @@ async function main() {
 
   console.log('Import done:', ok, 'upserted', err ? `, ${err} failed` : '');
 
-  // Window-diff cleanup: pokud běžíme v okně, smaž v DB vše, co do okna spadá,
-  // ale není ani v source JSONu, ani v overrides. Spouští se jen když není
-  // --replace-all (ten by už smazal všechno jinde) a když nedošlo k zásadnímu
-  // selhání upsertu (jinak bychom mohli smazat data, která se nestihla nahradit).
-  const noCleanup = args.includes('--no-cleanup');
-  if (!replaceAll && !noCleanup && cleanupWindow && err === 0) {
+  // Window-diff cleanup is OPT-IN via --cleanup. When enabled (and a window is set),
+  // it deletes DB rows inside the time window that are missing from the current batch.
+  // Safety: never runs alongside --replace-all (would be redundant) and never runs if
+  // any upsert batch failed (would risk deleting data that just failed to be replaced).
+  if (replaceAll) {
+    // Already handled by the --replace-all branch above; nothing to do.
+  } else if (!cleanupOptIn) {
+    console.log('Window-diff cleanup: SKIPPED (use --cleanup to enable).');
+  } else if (!cleanupWindow) {
+    console.log('Window-diff cleanup: SKIPPED (no window, use --from-today or --window-months with --cleanup).');
+  } else if (err > 0) {
+    console.warn('Window-diff cleanup: SKIPPED (upsert errors detected, refusing to delete).');
+  } else {
     try {
       const { data: dbRows, error: selErr } = await supabase
         .from('tournament_cache')
@@ -533,12 +604,6 @@ async function main() {
     } catch (e) {
       console.warn('Window-diff cleanup: neočekávaná chyba, přeskakuji:', e.message);
     }
-  } else if (!replaceAll && noCleanup) {
-    console.log('Window-diff cleanup: vypnuto přes --no-cleanup.');
-  } else if (!replaceAll && !cleanupWindow) {
-    console.log('Window-diff cleanup: přeskočeno (bez okna, spusť s --from-today nebo --window-months).');
-  } else if (err > 0) {
-    console.warn('Window-diff cleanup: přeskočeno kvůli chybám v upsertu.');
   }
 }
 

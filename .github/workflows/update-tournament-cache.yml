@@ -1,5 +1,5 @@
 # Každý měsíc obnoví turnajový plán z ITF Juniors: první běh stáhne 4 měsíce, další běhy přidají jeden měsíc.
-# Do DB se importuje vždy jen okno „od teď + 4 měsíce“ (--replace-all), aby cache zůstala aktuální.
+# Do DB se importuje vždy jen okno „od teď + 4 měsíce“ jako čistý upsert (bez mazání existujících řádků).
 # Spouští se 1. v měsíci ve 4:00 UTC (4:00 středoevropského času v zimě, 6:00 v létě).
 
 name: Update tournament cache (4 months)
@@ -126,11 +126,11 @@ jobs:
         run: |
           node scripts/validate-tournament-cache.js data/tournament-cache.json
 
-      - name: Import to Supabase (okno 4 měsíců dopředu, replace = vždy čerstvá cache)
+      - name: Import to Supabase (okno 4 měsíců dopředu, upsert-only, bez mazání)
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: node scripts/import-tournament-cache.js data/tournament-cache.json --from-today --window-months=4 --replace-all
+        run: node scripts/import-tournament-cache.js data/tournament-cache.json --from-today --window-months=4
 
       - name: Save tournament cache state to cache
         uses: actions/cache/save@v4
