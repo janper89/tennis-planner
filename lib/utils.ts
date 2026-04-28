@@ -87,18 +87,28 @@ export function formatShortPlayerName(name: string | null | undefined): string {
 export function formatCompactTournamentLabel(
   category: string | null | undefined,
   city: string | null | undefined,
-  fallbackName?: string | null
+  fallbackName?: string | null,
+  tournamentKey?: string | null
 ): string {
   const trimmedCategory = category?.trim() ?? '';
+  const normalizedCategory = trimmedCategory.toUpperCase();
   const trimmedCity = city?.trim() ?? '';
-  const countryMatch = fallbackName?.match(/\(([A-Z]{3})\)/);
-  const country = countryMatch?.[0] ?? '';
+  const normalizedTournamentKey = tournamentKey?.toUpperCase() ?? '';
+  const isEmptyCategory =
+    !trimmedCategory ||
+    normalizedCategory === 'N/A' ||
+    normalizedCategory === 'NA' ||
+    normalizedCategory === '-';
+  const isJgs =
+    normalizedTournamentKey.includes('-JGS-') || normalizedCategory === 'JGS';
 
-  const pieces = [trimmedCategory, trimmedCity].filter(Boolean);
-  if (pieces.length === 0) {
+  if (!trimmedCity) {
     return formatTournamentName(fallbackName ?? '');
   }
-  return `${pieces.join(' ')}${country ? ` ${country}` : ''}`.trim();
+
+  if (isJgs) return `JGS ${trimmedCity}`;
+  if (isEmptyCategory) return trimmedCity;
+  return `${trimmedCategory} ${trimmedCity}`.trim();
 }
 
 /**

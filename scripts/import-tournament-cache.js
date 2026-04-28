@@ -267,7 +267,14 @@ function toCacheRow(item) {
   if (shouldPreferFirstDayMainDraw(start_date, firstDayMainDraw)) {
     start_date = firstDayMainDraw;
   }
-  const category = item.category ?? null;
+  const rawCategory = typeof item.category === 'string' ? item.category.trim() : item.category;
+  const normalizedCategory = typeof rawCategory === 'string' ? rawCategory.toUpperCase() : '';
+  const isEmptyCategory =
+    rawCategory == null ||
+    (typeof rawCategory === 'string' &&
+      (!rawCategory || normalizedCategory === 'N/A' || normalizedCategory === 'NA' || normalizedCategory === '-'));
+  const isJgsKey = typeof tournament_key === 'string' && tournament_key.toUpperCase().includes('-JGS-');
+  const category = isEmptyCategory ? (isJgsKey ? 'JGS' : null) : rawCategory;
 
   if (!tournament_key || !name || !start_date) {
     return null;
