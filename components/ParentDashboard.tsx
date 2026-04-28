@@ -146,6 +146,27 @@ export default function ParentDashboard({
     }
   }, [showForm, editingEntry]);
 
+  // When inline edit opens outside viewport, gently scroll it into view.
+  useEffect(() => {
+    if (!editingEntry) return;
+
+    const targetId = `entry-inline-edit-${editingEntry.id}`;
+    const timer = window.setTimeout(() => {
+      const el = document.getElementById(targetId);
+      if (!el) return;
+
+      const rect = el.getBoundingClientRect();
+      const isAboveViewport = rect.top < 0;
+      const isBelowViewport = rect.bottom > window.innerHeight;
+
+      if (isAboveViewport || isBelowViewport) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [editingEntry]);
+
   // Group entries by week (legacy odhlasen záznamy skrýváme – v minimal modu neslouží).
   const entriesByWeek = entries
     .filter((e) => e.status !== 'odhlasen')
@@ -1184,97 +1205,66 @@ export default function ParentDashboard({
         )}
 
         {/* Tournament Form */}
-        {(showForm || editingEntry) && selectedPlayer && !readOnly && (
+        {showForm && selectedPlayer && !readOnly && (
           <div className="mb-6 rounded-lg bg-white p-6 shadow">
-            <h3 className="mb-4 text-lg font-semibold">
-              {editingEntry ? 'Upravit turnaj' : 'Nový turnaj'}
-            </h3>
+            <h3 className="mb-4 text-lg font-semibold">Nový turnaj</h3>
             
-            {/* Toggle between auto search and manual entry (only for new entries) */}
-            {!editingEntry && (
-              <div className="mb-4">
-                <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      checked={useAutoSearch}
-                      onChange={() => {
-                        setUseAutoSearch(true);
-                        setSearchError(null);
-                        setSearchResults(null);
-                      }}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="text-sm font-medium text-gray-700">
-                      Automatické vyhledávání (ITF)
-                    </span>
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      checked={!useAutoSearch}
-                      onChange={() => {
-                        setUseAutoSearch(false);
-                        setSearchError(null);
-                        setSearchResults(null);
-                      }}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="text-sm font-medium text-gray-700">
-                      Ruční zadání
-                    </span>
-                  </label>
-                </div>
-                {useAutoSearch && (
-                  <p className="mt-2 text-xs text-gray-500">
-                    Zadej název turnaje a systém ho automaticky vyhledá v ITF databázi
-                  </p>
-                )}
-                {searchError && (
-                  <div className="mt-2 rounded-md bg-yellow-50 p-3 text-sm text-yellow-800">
-                    {searchError}
-                    <p className="mt-1 text-xs">
-                      Můžeš pokračovat s ručním zadáním níže.
-                    </p>
-                  </div>
-                )}
+            <div className="mb-4">
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    checked={useAutoSearch}
+                    onChange={() => {
+                      setUseAutoSearch(true);
+                      setSearchError(null);
+                      setSearchResults(null);
+                    }}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">
+                    Automatické vyhledávání (ITF)
+                  </span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    checked={!useAutoSearch}
+                    onChange={() => {
+                      setUseAutoSearch(false);
+                      setSearchError(null);
+                      setSearchResults(null);
+                    }}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">
+                    Ruční zadání
+                  </span>
+                </label>
               </div>
-            )}
+              {useAutoSearch && (
+                <p className="mt-2 text-xs text-gray-500">
+                  Zadej název turnaje a systém ho automaticky vyhledá v ITF databázi
+                </p>
+              )}
+              {searchError && (
+                <div className="mt-2 rounded-md bg-yellow-50 p-3 text-sm text-yellow-800">
+                  {searchError}
+                  <p className="mt-1 text-xs">
+                    Můžeš pokračovat s ručním zadáním níže.
+                  </p>
+                </div>
+              )}
+            </div>
 
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
                 const formData = new FormData(e.currentTarget as HTMLFormElement);
-                if (editingEntry) {
-                  await handleUpdateEntry(formData);
-                } else {
-                  await handleAddTournament(formData);
-                }
+                await handleAddTournament(formData);
               }}
               className="space-y-4"
             >
-              {editingEntry && (
-                <input type="hidden" name="entry_id" value={editingEntry.id} />
-              )}
-              {editingEntry?.status === 'odehrano' && (
-                <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
-                  <p className="mb-2 text-sm font-medium text-amber-900">
-                    Tento turnaj je označen jako odehrán.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await handleUnmarkAsPlayed(editingEntry.id);
-                      setEditingEntry(null);
-                      setShowForm(false);
-                    }}
-                    disabled={loading}
-                    className="rounded-md bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-800 hover:bg-amber-200 disabled:opacity-50"
-                  >
-                    Zrušit odehráno (vrátit na plánováno)
-                  </button>
-                </div>
-              )}
               <input
                 type="hidden"
                 name="player_id"
@@ -1284,7 +1274,7 @@ export default function ParentDashboard({
                 <label className="block text-sm font-medium text-gray-700">
                   Název turnaje *
                 </label>
-                {useAutoSearch && !editingEntry ? (
+                {useAutoSearch ? (
                   <TournamentNameInput
                     value={tournamentNameValue}
                     onChange={(v) => {
@@ -1302,7 +1292,6 @@ export default function ParentDashboard({
                     type="text"
                     name="nazev"
                     required
-                    defaultValue={editingEntry ? formatTournamentName(editingEntry.tournament.nazev) : ''}
                     onChange={() => setSearchResults(null)}
                     placeholder="Název turnaje"
                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
@@ -1342,8 +1331,8 @@ export default function ParentDashboard({
                   </p>
                 </div>
               )}
-              {/* Manual entry fields - shown when not using auto search or when editing */}
-              {(!useAutoSearch || editingEntry || searchError) && (
+              {/* Manual entry fields - shown when not using auto search */}
+              {(!useAutoSearch || searchError) && (
                 <>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
@@ -1353,7 +1342,6 @@ export default function ParentDashboard({
                       type="text"
                       name="kategorie"
                       required={!useAutoSearch || !!searchError}
-                      defaultValue={editingEntry?.tournament.kategorie || ''}
                       className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
                     />
                   </div>
@@ -1365,7 +1353,6 @@ export default function ParentDashboard({
                       type="text"
                       name="misto"
                       required={!useAutoSearch || !!searchError}
-                      defaultValue={editingEntry?.tournament.misto || ''}
                       className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
                     />
                   </div>
@@ -1377,11 +1364,6 @@ export default function ParentDashboard({
                       type="date"
                       name="datum"
                       required={!useAutoSearch || !!searchError}
-                      defaultValue={
-                        editingEntry?.tournament.datum
-                          ? editingEntry.tournament.datum
-                          : ''
-                      }
                       className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
                     />
                   </div>
@@ -1394,7 +1376,7 @@ export default function ParentDashboard({
                 <select
                   name="priority"
                   required
-                  defaultValue={editingEntry?.priority || 1}
+                  defaultValue={1}
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
                 >
                   <option value={1}>1 - Preferovaný</option>
@@ -1409,7 +1391,6 @@ export default function ParentDashboard({
                 <textarea
                   name="poznamka"
                   rows={3}
-                  defaultValue={editingEntry?.poznamka_rodic || ''}
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
                 />
               </div>
@@ -1419,13 +1400,12 @@ export default function ParentDashboard({
                   disabled={loading}
                   className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {loading ? 'Ukládám...' : editingEntry ? 'Uložit' : 'Přidat'}
+                  {loading ? 'Ukládám...' : 'Přidat'}
                 </button>
                 <button
                   type="button"
                   onClick={() => {
                     setShowForm(false);
-                    setEditingEntry(null);
                     setSearchError(null);
                     setSearchResults(null);
                     setUseAutoSearch(true);
@@ -1544,6 +1524,9 @@ export default function ParentDashboard({
                                 onClick={() => {
                                   setEditingEntry(entry);
                                   setShowForm(false);
+                                  setSearchError(null);
+                                  setSearchResults(null);
+                                  setUseAutoSearch(true);
                                 }}
                                 className="rounded-md bg-blue-100 px-3 py-1 text-sm text-blue-700 hover:bg-blue-200"
                               >
@@ -1564,6 +1547,134 @@ export default function ParentDashboard({
                             </div>
                             )}
                           </div>
+                          {editingEntry?.id === entry.id && !readOnly && (
+                            <div
+                              id={`entry-inline-edit-${entry.id}`}
+                              className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4"
+                            >
+                              <h5 className="mb-3 text-sm font-semibold text-blue-900">
+                                Upravit turnaj
+                              </h5>
+                              <form
+                                onSubmit={async (e) => {
+                                  e.preventDefault();
+                                  const formData = new FormData(e.currentTarget as HTMLFormElement);
+                                  await handleUpdateEntry(formData);
+                                }}
+                                className="space-y-3"
+                              >
+                                <input type="hidden" name="entry_id" value={entry.id} />
+                                {entry.status === 'odehrano' && (
+                                  <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
+                                    <p className="mb-2 text-sm font-medium text-amber-900">
+                                      Tento turnaj je označen jako odehrán.
+                                    </p>
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        await handleUnmarkAsPlayed(entry.id);
+                                        setEditingEntry(null);
+                                      }}
+                                      disabled={loading}
+                                      className="rounded-md bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-800 hover:bg-amber-200 disabled:opacity-50"
+                                    >
+                                      Zrušit odehráno (vrátit na plánováno)
+                                    </button>
+                                  </div>
+                                )}
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700">
+                                    Název turnaje *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    name="nazev"
+                                    required
+                                    defaultValue={formatTournamentName(entry.tournament.nazev)}
+                                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700">
+                                    Kategorie *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    name="kategorie"
+                                    required
+                                    defaultValue={entry.tournament.kategorie || ''}
+                                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700">
+                                    Místo *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    name="misto"
+                                    required
+                                    defaultValue={entry.tournament.misto || ''}
+                                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700">
+                                    Datum *
+                                  </label>
+                                  <input
+                                    type="date"
+                                    name="datum"
+                                    required
+                                    defaultValue={entry.tournament.datum || ''}
+                                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700">
+                                    Priorita (1-3) *
+                                  </label>
+                                  <select
+                                    name="priority"
+                                    required
+                                    defaultValue={entry.priority || 1}
+                                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                                  >
+                                    <option value={1}>1 - Preferovaný</option>
+                                    <option value={2}>2 - Střední</option>
+                                    <option value={3}>3 - Nízká</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700">
+                                    Poznámka
+                                  </label>
+                                  <textarea
+                                    name="poznamka"
+                                    rows={3}
+                                    defaultValue={entry.poznamka_rodic || ''}
+                                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                                  />
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                                  >
+                                    {loading ? 'Ukládám...' : 'Uložit'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingEntry(null)}
+                                    className="rounded-md bg-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-400"
+                                  >
+                                    Zrušit
+                                  </button>
+                                </div>
+                              </form>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
