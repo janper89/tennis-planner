@@ -220,6 +220,19 @@ export default function TripsSection({
       return;
     }
 
+    // Kontrola duplicit: nový výjezd na turnaj, který už v plánu máme
+    if (!editingTrip && form.tournament_id) {
+      const duplicate = trips.find(
+        (t) => t.tournament_id === form.tournament_id && t.status !== 'zruseno'
+      );
+      if (duplicate) {
+        setError(
+          `Tento turnaj už máš v plánu jako „${duplicate.title}". Pokud chceš upravit detaily, použij tlačítko Upravit.`
+        );
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       if (editingTrip) {
