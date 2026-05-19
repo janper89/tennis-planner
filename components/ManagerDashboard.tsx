@@ -1271,7 +1271,7 @@ export default function ManagerDashboard({
         </div>
 
         {/* Filters */}
-        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3 md:items-end">
           <div>
             <label className="flex items-center gap-2">
               <input
