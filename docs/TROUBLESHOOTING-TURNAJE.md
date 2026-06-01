@@ -101,8 +101,8 @@ nezveřejnil) nebo scraper selhal.
 
 ### 4. Nový turnaj v cache chybí
 
-**Řešení**: `npm run refresh-tournaments`. Stahuje kalendář 18 měsíců dopředu
-a factsheety pro následujících 6 měsíců plánu.
+**Řešení**: `npm run refresh-tournaments` (default **4 měsíce** dopředu, minimal mode bez factsheetů).
+Automaticky běží GitHub Actions 1× měsíčně — viz `docs/automaticka-obnova-turnaju.md`.
 
 Pokud ani to nepomůže (ITF ho ještě nemá), přidej ruční override do
 [`data/tournament-cache-overrides.json`](../data/tournament-cache-overrides.json)

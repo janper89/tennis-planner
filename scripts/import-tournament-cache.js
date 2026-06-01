@@ -6,15 +6,15 @@
  *
  * Usage:
  *   node scripts/import-tournament-cache.js [path/to/file.json]
- *   node scripts/import-tournament-cache.js [path/to/file.json] --from-today --window-months=18
- *   node scripts/import-tournament-cache.js [path/to/file.json] --from-today --window-months=18 --cleanup
+ *   node scripts/import-tournament-cache.js [path/to/file.json] --from-today --window-months=4
+ *   node scripts/import-tournament-cache.js [path/to/file.json] --from-today --window-months=4 --cleanup
  *   node scripts/import-tournament-cache.js [path/to/file.json] --replace-all [--force-replace]
  *
  * Default file: data/tournament-cache.json
  *
  * Flags:
  *   --from-today              keep only rows with start_date >= today
- *   --window-months=N         keep only rows in [today, today+N months), default CACHE_WINDOW_MONTHS_SEARCH or 18
+ *   --window-months=N         keep only rows in [today, today+N months), default CACHE_WINDOW_MONTHS_SEARCH or 4
  *   --cleanup                 OPT-IN: after upsert, delete DB rows inside the time window that
  *                             are not present in the current batch (window-diff cleanup).
  *                             Requires a window (--from-today or --window-months).

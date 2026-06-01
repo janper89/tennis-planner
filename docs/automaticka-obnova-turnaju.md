@@ -30,4 +30,6 @@ Kdybys chtěl obnovit cache hned (nečekat na 1. v měsíci):
 ## Kde je to nakonfigurované
 
 - Workflow: `.github/workflows/update-tournament-cache.yml`
-- Detaily importu: `scripts/import-tournament-cache.js` (parametry `--from-today --window-months=4 --replace-all`)
+- Fetch v CI vždy s `--months=1` (jeden kalendářní měsíc na krok).
+- Detaily importu: `scripts/import-tournament-cache.js` (`--from-today --window-months=4`, upsert-only).
+- Nahlášení chybějícího turnaje z app: `docs/nahlaseni-chyby.md`

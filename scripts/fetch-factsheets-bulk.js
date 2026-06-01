@@ -15,7 +15,7 @@
  *   --import    po stažení spustit import do Supabase (import-tournament-cache.js)
  *   --limit=N   zpracovat max N turnajů (pro test)
  *   --planning-window-months=N  stahovat factsheety jen pro planning horizont (default CACHE_WINDOW_MONTHS_PLANNING nebo 6)
- *   --search-window-months=N    importovat cache pro autocomplete horizont (default CACHE_WINDOW_MONTHS_SEARCH nebo 18)
+ *   --search-window-months=N    importovat cache pro autocomplete horizont (default CACHE_WINDOW_MONTHS_SEARCH nebo 4)
  */
 
 const fs = require('fs');
@@ -47,7 +47,7 @@ const planningWindowMonths = planningWindowArg
   : parseInt(process.env.CACHE_WINDOW_MONTHS_PLANNING || '6', 10);
 const searchWindowMonths = searchWindowArg
   ? parseInt(searchWindowArg.split('=')[1], 10)
-  : parseInt(process.env.CACHE_WINDOW_MONTHS_SEARCH || '18', 10);
+  : parseInt(process.env.CACHE_WINDOW_MONTHS_SEARCH || '4', 10);
 const fileArg = args.filter((a) => !a.startsWith('--'))[0];
 const inputPath = fileArg || path.join(process.cwd(), 'data', 'tournament-cache.json');
 const outputPath = path.join(process.cwd(), 'data', 'tournament-cache-full.json');
