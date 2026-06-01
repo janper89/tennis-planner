@@ -23,6 +23,7 @@ import {
 } from '@/lib/tournament-service';
 import { adjustManualPlayedAdjustment } from '@/lib/manual-played-adjustment';
 import TournamentNameInput from '@/components/TournamentNameInput';
+import ErrorReportButton from '@/components/ErrorReportButton';
 
 type Player = Database['public']['Tables']['player']['Row'];
 type Tournament = Database['public']['Tables']['tournament']['Row'];
@@ -885,6 +886,7 @@ export default function ParentDashboard({
             </div>
             {!readOnly && !hideSessionActions && (
               <div className="flex shrink-0 flex-wrap items-center gap-3">
+                <ErrorReportButton profileLabel="Rodič" reporterEmail={userEmail} />
                 <Link
                   href="/trips"
                   className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"

@@ -19,6 +19,7 @@ import TournamentNameInput from '@/components/TournamentNameInput';
 import ParentDashboard from '@/components/ParentDashboard';
 import { registerPlayerForTournament, type ITFTournamentSearchResult } from '@/lib/tournament-service';
 import { adjustManualPlayedAdjustment } from '@/lib/manual-played-adjustment';
+import ErrorReportButton from '@/components/ErrorReportButton';
 import type { Database } from '@/types/database';
 
 type Player = Database['public']['Tables']['player']['Row'];
@@ -877,6 +878,7 @@ export default function ManagerDashboard({
               Tenisový klub - Manažer
             </h1>
             <div className="flex shrink-0 flex-wrap items-center gap-3">
+              <ErrorReportButton profileLabel="Manažer" reporterEmail={managerEmail} />
               {isAdmin && <RoleSwitcher />}
               <Link
                 href="/trips"
