@@ -41,7 +41,7 @@ if (!url || !serviceKey) {
 }
 
 const windowMonthsArg = process.argv[2];
-const windowMonths = windowMonthsArg ? parseInt(windowMonthsArg, 10) : parseInt(process.env.CACHE_WINDOW_MONTHS_SEARCH || '18', 10);
+const windowMonths = windowMonthsArg ? parseInt(windowMonthsArg, 10) : parseInt(process.env.CACHE_WINDOW_MONTHS_SEARCH || '4', 10);
 
 const fullPath = path.join(process.cwd(), 'data', 'tournament-cache-full.json');
 const fallbackPath = path.join(process.cwd(), 'data', 'tournament-cache.json');
@@ -105,8 +105,8 @@ const sourcePath = fs.existsSync(fullPath) ? fullPath : fallbackPath;
   const dbWithStatusInCity = dbRows.filter((r) => STATUS_MARKER_RE.test(String(r.city || ''))).length;
 
   const today0 = start.getTime();
-  const horizon = Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 3, start.getUTCDate());
-  const dbInNext3M = dbRows.filter((r) => {
+  const horizon = Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + windowMonths, start.getUTCDate());
+  const dbInHorizon = dbRows.filter((r) => {
     const d = new Date(r.start_date + 'T00:00:00Z').getTime();
     return d >= today0 && d < horizon;
   }).length;
@@ -118,7 +118,7 @@ const sourcePath = fs.existsSync(fullPath) ? fullPath : fallbackPath;
   console.log('  Source JSON:', sourceCount, 'řádků');
   console.log('  DB           :', dbCount, 'řádků');
   console.log('  Rozdíl        :', dbCount - sourceCount, `(${(diffRatio * 100).toFixed(1)} %)`);
-  console.log('  DB v příštích 3 měsících:', dbInNext3M, '(min ' + MIN_ROWS_3M + ')');
+  console.log(`  DB v příštích ${windowMonths} měsících:`, dbInHorizon, '(min ' + MIN_ROWS_3M + ')');
   console.log('  DB city obsahuje (CLOSED/CANCELLED):', dbWithStatusInCity);
 
   let warn = false;
@@ -126,8 +126,8 @@ const sourcePath = fs.existsSync(fullPath) ? fullPath : fallbackPath;
     console.warn(`  WARN: Odchylka DB vs JSON > 5 % (|${dbCount}-${sourceCount}| / ${sourceCount}).`);
     warn = true;
   }
-  if (dbInNext3M < MIN_ROWS_3M) {
-    console.warn(`  WARN: DB má málo turnajů v příštích 3 měsících (${dbInNext3M} < ${MIN_ROWS_3M}).`);
+  if (dbInHorizon < MIN_ROWS_3M) {
+    console.warn(`  WARN: DB má málo turnajů v příštích ${windowMonths} měsících (${dbInHorizon} < ${MIN_ROWS_3M}).`);
     warn = true;
   }
   if (dbWithStatusInCity > 0) {

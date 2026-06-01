@@ -12,6 +12,8 @@ on:
 jobs:
   update-cache:
     runs-on: ubuntu-latest
+    env:
+      CACHE_WINDOW_MONTHS_SEARCH: '4'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -78,7 +80,7 @@ jobs:
 
       - name: Full run – fetch month 1
         if: steps.mode.outputs.mode == 'full'
-        run: node scripts/fetch-calendar-itf-juniors.js "$M1"
+        run: node scripts/fetch-calendar-itf-juniors.js "$M1" --months=1
 
       - name: Full run – merge baseline
         if: steps.mode.outputs.mode == 'full'
@@ -86,7 +88,7 @@ jobs:
 
       - name: Full run – fetch month 2
         if: steps.mode.outputs.mode == 'full'
-        run: node scripts/fetch-calendar-itf-juniors.js "$M2"
+        run: node scripts/fetch-calendar-itf-juniors.js "$M2" --months=1
 
       - name: Full run – merge month 2
         if: steps.mode.outputs.mode == 'full'
@@ -94,7 +96,7 @@ jobs:
 
       - name: Full run – fetch month 3
         if: steps.mode.outputs.mode == 'full'
-        run: node scripts/fetch-calendar-itf-juniors.js "$M3"
+        run: node scripts/fetch-calendar-itf-juniors.js "$M3" --months=1
 
       - name: Full run – merge month 3
         if: steps.mode.outputs.mode == 'full'
@@ -102,7 +104,7 @@ jobs:
 
       - name: Full run – fetch month 4
         if: steps.mode.outputs.mode == 'full'
-        run: node scripts/fetch-calendar-itf-juniors.js "$M4"
+        run: node scripts/fetch-calendar-itf-juniors.js "$M4" --months=1
 
       - name: Full run – merge month 4 and finalize
         if: steps.mode.outputs.mode == 'full'
@@ -113,7 +115,7 @@ jobs:
 
       - name: Incremental run – fetch next month only
         if: steps.mode.outputs.mode == 'incremental'
-        run: node scripts/fetch-calendar-itf-juniors.js "${{ steps.mode.outputs.next_month }}"
+        run: node scripts/fetch-calendar-itf-juniors.js "${{ steps.mode.outputs.next_month }}" --months=1
 
       - name: Incremental run – merge with state and finalize
         if: steps.mode.outputs.mode == 'incremental'
@@ -126,7 +128,7 @@ jobs:
         run: |
           node scripts/validate-tournament-cache.js data/tournament-cache.json
 
-      - name: Import to Supabase (okno 4 měsíců dopředu, upsert-only, bez mazání)
+      - name: Import to Supabase (okno 4 měsíce dopředu, upsert-only, bez mazání)
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

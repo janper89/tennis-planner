@@ -81,7 +81,7 @@ try {
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const defaultSearchWindowMonths = parseInt(process.env.CACHE_WINDOW_MONTHS_SEARCH || '18', 10);
+const defaultSearchWindowMonths = parseInt(process.env.CACHE_WINDOW_MONTHS_SEARCH || '4', 10);
 
 if (!url || !serviceKey) {
   console.error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY (use .env.local or export)');

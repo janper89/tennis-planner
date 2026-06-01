@@ -1,8 +1,12 @@
 #!/bin/bash
 # Obnoví turnajový kalendář v minimal modu:
-# - search cache horizont (autocomplete): CACHE_WINDOW_MONTHS_SEARCH, default 18 měsíců
+# - search cache horizont (autocomplete): CACHE_WINDOW_MONTHS_SEARCH, default 4 měsíce
 # - factsheet enrichment vypnutý (draw_size, deadlines, ball atd. se v UI nepoužívají).
 # Spouštět ručně nebo přes cron (např. 1. den v měsíci).
+#
+# Bezpečnost: import do DB je čistě upsert (žádné řádky se nemažou). Window-diff
+# cleanup ani --replace-all se odsud NEVOLAJÍ, aby nekompletní ITF scrape nikdy
+# nemohl tiše smazat existující data v tournament_cache.
 #
 # Použití:
 #   ./scripts/refresh-tournaments.sh
@@ -16,7 +20,7 @@ set -e
 cd "$(dirname "$0")/.."
 
 echo "=== refresh-tournaments.sh $(date) ==="
-SEARCH_WINDOW_MONTHS="${CACHE_WINDOW_MONTHS_SEARCH:-18}"
+SEARCH_WINDOW_MONTHS="${CACHE_WINDOW_MONTHS_SEARCH:-4}"
 PLANNING_WINDOW_MONTHS="${CACHE_WINDOW_MONTHS_PLANNING:-6}"
 
 WITH_FACTSHEETS=0

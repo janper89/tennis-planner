@@ -6,7 +6,7 @@
  *   node scripts/fetch-calendar-itf-juniors.js [YYYY-MM]
  *   node scripts/fetch-calendar-itf-juniors.js [YYYY-MM] --months=18
  *
- * Bez argumentu: aktualni mesic + CACHE_WINDOW_MONTHS_SEARCH (default 18 mesicu) dopredu.
+ * Bez argumentu: aktualni mesic + CACHE_WINDOW_MONTHS_SEARCH (default 4 mesice) dopredu.
  * S --months=N: stahne N mesicu od zadaneho (nebo aktualniho) mesice.
  * Priklad: 2026-02 --months=18 -> unor 2026 az cervenec 2027.
  *
@@ -40,7 +40,7 @@ function getMonthsToFetch(startMonth, count) {
 function parseArgs() {
   const args = process.argv.slice(2);
   const monthsArg = args.find((a) => a.startsWith('--months='));
-  const defaultMonths = parseInt(process.env.CACHE_WINDOW_MONTHS_SEARCH || '18', 10);
+  const defaultMonths = parseInt(process.env.CACHE_WINDOW_MONTHS_SEARCH || '4', 10);
   const months = monthsArg ? parseInt(monthsArg.split('=')[1], 10) : defaultMonths;
   const startArg = args.find((a) => !a.startsWith('--') && /^\d{4}-\d{2}$/.test(a));
   const startMonth = startArg || DEFAULT_START;
@@ -208,11 +208,18 @@ function mapApiItemToTournament(item) {
   };
 }
 
-function assertMonthlySanity(month, tournaments, totalItems) {
-  if (tournaments.length === 0) throw new Error(`fetchMonth ${month}: 0 items`);
-  if (tournaments.length < 10) throw new Error(`fetchMonth ${month}: only ${tournaments.length} items (< 10)`);
-  if (tournaments.length < totalItems) {
-    throw new Error(`fetchMonth ${month}: pagination incomplete - got ${tournaments.length}, expected ${totalItems}`);
+function assertMonthlySanity(month, tournaments, allItemsCount, totalItems) {
+  if (allItemsCount < totalItems) {
+    throw new Error(`fetchMonth ${month}: pagination incomplete - got ${allItemsCount}, expected ${totalItems}`);
+  }
+  if (tournaments.length === 0 && totalItems > 0) {
+    throw new Error(`fetchMonth ${month}: 0 tournaments after filter (${totalItems} raw items)`);
+  }
+  // Daleké měsíce mohou mít na ITF <10 turnajů — selhat jen když API vrátilo víc než 10 raw položek.
+  if (totalItems >= 10 && tournaments.length < 10) {
+    throw new Error(
+      `fetchMonth ${month}: only ${tournaments.length} tournaments after filter (< 10, API totalItems=${totalItems})`
+    );
   }
 }
 
@@ -236,7 +243,7 @@ async function fetchMonth(session, month) {
     .filter(Boolean)
     .filter((tournament) => !shouldSkipTournament(tournament));
 
-  assertMonthlySanity(month, tournaments, totalItems);
+  assertMonthlySanity(month, tournaments, allItems.length, totalItems);
   return tournaments;
 }
 
