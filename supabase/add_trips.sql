@@ -54,7 +54,46 @@ CREATE TRIGGER trip_updated_at_trigger
 
 -- ============================================================
 -- RLS POLICIES
+-- (křížové kontroly trip ↔ trip_player přes SECURITY DEFINER – viz fix_trip_rls_recursion.sql)
 -- ============================================================
+
+CREATE OR REPLACE FUNCTION trip_user_has_player_assignment(p_trip_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+SET row_security = off
+AS $$
+    SELECT EXISTS (
+        SELECT 1
+        FROM trip_player tp
+        JOIN player p ON p.id = tp.player_id
+        WHERE tp.trip_id = p_trip_id
+            AND (
+                p.parent_id = get_user_id()
+                OR p.self_managed_by = get_user_id()
+                OR (get_user_role() = 'coach' AND p.coach_id = get_user_id())
+            )
+    );
+$$;
+
+CREATE OR REPLACE FUNCTION trip_user_is_coach_owner(p_trip_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+SET row_security = off
+AS $$
+    SELECT EXISTS (
+        SELECT 1
+        FROM trip t
+        WHERE t.id = p_trip_id
+            AND t.deleted_at IS NULL
+            AND t.coach_id = get_user_id()
+    );
+$$;
 
 ALTER TABLE trip ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trip_player ENABLE ROW LEVEL SECURITY;
@@ -71,17 +110,7 @@ CREATE POLICY "Trip visible to relevant users"
         deleted_at IS NULL AND (
             get_user_role() = 'manager'
             OR coach_id = get_user_id()
-            OR EXISTS (
-                SELECT 1
-                FROM trip_player tp
-                JOIN player p ON p.id = tp.player_id
-                WHERE tp.trip_id = trip.id
-                    AND (
-                        p.parent_id = get_user_id()
-                        OR p.self_managed_by = get_user_id()
-                        OR (get_user_role() = 'coach' AND p.coach_id = get_user_id())
-                    )
-            )
+            OR trip_user_has_player_assignment(id)
         )
     );
 
@@ -120,12 +149,7 @@ CREATE POLICY "Trip player visible to relevant users"
     ON trip_player FOR SELECT
     USING (
         get_user_role() = 'manager'
-        OR EXISTS (
-            SELECT 1 FROM trip t
-            WHERE t.id = trip_player.trip_id
-                AND t.deleted_at IS NULL
-                AND t.coach_id = get_user_id()
-        )
+        OR trip_user_is_coach_owner(trip_id)
         OR EXISTS (
             SELECT 1 FROM player p
             WHERE p.id = trip_player.player_id
@@ -143,11 +167,7 @@ CREATE POLICY "Coaches and managers can manage trip players (insert)"
     ON trip_player FOR INSERT
     WITH CHECK (
         get_user_role() = 'manager'
-        OR EXISTS (
-            SELECT 1 FROM trip t
-            WHERE t.id = trip_player.trip_id
-                AND t.coach_id = get_user_id()
-        )
+        OR trip_user_is_coach_owner(trip_id)
     );
 
 DROP POLICY IF EXISTS "Coaches and managers can manage trip players (delete)" ON trip_player;
@@ -155,9 +175,5 @@ CREATE POLICY "Coaches and managers can manage trip players (delete)"
     ON trip_player FOR DELETE
     USING (
         get_user_role() = 'manager'
-        OR EXISTS (
-            SELECT 1 FROM trip t
-            WHERE t.id = trip_player.trip_id
-                AND t.coach_id = get_user_id()
-        )
+        OR trip_user_is_coach_owner(trip_id)
     );

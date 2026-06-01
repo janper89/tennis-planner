@@ -67,6 +67,7 @@ scripts/
 
 **Supabase / RLS:**
 - Nová tabulka = RLS ON → přidat policy. SQL v `supabase/` není auto-migrace.
+- **Výjezdy (`trip` / `trip_player`):** politiky se nesmí křížově dotazovat přes `EXISTS` (42P17 infinite recursion). Oprava: `supabase/fix_trip_rls_recursion.sql`. Detail: vault `Memory/tennis-club/bugfixes/2026-06-01_trip-rls-infinite-recursion.md`.
 - Dva klienty: `lib/supabase/client.ts` vs `server.ts`.
 - Magic link redirect URL v Supabase Dashboard.
 
